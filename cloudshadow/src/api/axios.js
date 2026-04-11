@@ -24,7 +24,11 @@ api.interceptors.request.use(
 api.interceptors.response.use(
   (response) => {
     // Unwrap ApiResponse<T> → return .data field
-    return response.data.data
+    // Handle both { success, message, data } shape and plain responses
+    if (response.data && typeof response.data === 'object' && 'data' in response.data) {
+      return response.data.data
+    }
+    return response.data
   },
   (error) => {
     const status  = error.response?.status
@@ -32,7 +36,6 @@ api.interceptors.response.use(
 
     if (status === 401) {
       localStorage.clear()
-      // Use window.location to avoid circular import with router
       window.location.href = '/login'
       return Promise.reject(error)
     }
@@ -53,7 +56,7 @@ api.interceptors.response.use(
     }
 
     if (status === 400) {
-      // Validation errors are handled by the calling component
+      // Let the calling component handle validation errors
       return Promise.reject(error)
     }
 

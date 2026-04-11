@@ -1,11 +1,11 @@
-import { useState }   from 'react'
+import { useState }    from 'react'
 import toast           from 'react-hot-toast'
 import { createServer } from '../../api/servers'
 import { X }           from 'lucide-react'
 
 export default function AddServerModal({ onClose, onCreated }) {
-  const [name, setName]     = useState('')
-  const [error, setError]   = useState('')
+  const [name, setName]       = useState('')
+  const [error, setError]     = useState('')
   const [loading, setLoading] = useState(false)
 
   const handleSubmit = async (e) => {
@@ -16,7 +16,7 @@ export default function AddServerModal({ onClose, onCreated }) {
     try {
       const server = await createServer({ name: name.trim() })
       toast.success(`Server "${server.name}" created!`)
-      onCreated(server)  // parent will open InstallModal
+      onCreated(server)
       onClose()
     } catch (err) {
       const status  = err.response?.status
@@ -24,11 +24,15 @@ export default function AddServerModal({ onClose, onCreated }) {
 
       if (status === 409) {
         setError('A server with this name already exists')
-      } else if (status === 400 && payload?.validationErrors) {
-        setError(payload.validationErrors[0]?.message || 'Validation error')
-      } else {
-        toast.error('Failed to create server')
+      } else if (status === 400) {
+        const validationErrors = payload?.validationErrors
+        if (validationErrors && validationErrors.length > 0) {
+          setError(validationErrors[0]?.message || 'Validation error')
+        } else {
+          setError(payload?.message || 'Invalid input')
+        }
       }
+      // 403, 500 etc. are handled by axios interceptor already
     } finally {
       setLoading(false)
     }
@@ -36,10 +40,10 @@ export default function AddServerModal({ onClose, onCreated }) {
 
   return (
     <div className="fixed inset-0 z-50 flex items-center justify-center p-4 bg-black/60 backdrop-blur-sm">
-      <div className="bg-[#1f2937] border border-[#374151] rounded-[1.75rem] w-full max-w-sm shadow-2xl app-panel-soft overflow-hidden">
+      <div className="bg-[#1f2937] border border-[#374151] rounded-xl w-full max-w-md shadow-2xl">
 
         {/* Header */}
-        <div className="flex items-center justify-between px-6 py-4 border-b border-[#374151]/70">
+        <div className="flex items-center justify-between px-6 py-4 border-b border-[#374151]">
           <h2 className="text-base font-semibold text-[#E6EEF2]">Add New Server</h2>
           <button
             onClick={onClose}
@@ -51,11 +55,11 @@ export default function AddServerModal({ onClose, onCreated }) {
 
         {/* Body */}
         <form onSubmit={handleSubmit} className="px-6 py-5">
-          <p className="text-sm text-[#9AA6B2] mb-5 leading-7">
+          <p className="text-sm text-[#9AA6B2] mb-4">
             Enter a unique name for your server. An agent token will be generated.
           </p>
 
-          <label className="app-label">
+          <label className="block text-sm font-medium text-[#9AA6B2] mb-1.5">
             Server Name
           </label>
           <input
@@ -65,15 +69,17 @@ export default function AddServerModal({ onClose, onCreated }) {
             placeholder="e.g. app-server-01"
             autoFocus
             className={`
-              app-input w-full
+              w-full px-4 py-2.5 rounded-lg
               bg-[#0f1724] border text-[#E6EEF2]
               placeholder:text-[#374151]
-              focus:outline-none focus:ring-2 focus:ring-[#3f51b5]/45
-              text-sm
+              focus:outline-none focus:ring-2 focus:ring-[#3f51b5]
+              text-sm transition-all
               ${error ? 'border-[#E53935]' : 'border-[#374151]'}
             `}
           />
-          {error && <p className="text-xs text-[#E53935] mt-1">{error}</p>}
+          {error && (
+            <p className="text-xs text-[#E53935] mt-1">{error}</p>
+          )}
 
           {/* Footer */}
           <div className="flex justify-end gap-3 mt-6">
@@ -81,7 +87,7 @@ export default function AddServerModal({ onClose, onCreated }) {
               type="button"
               onClick={onClose}
               className="
-                app-button-sm text-sm font-medium
+                px-4 py-2 rounded-lg text-sm font-medium
                 text-[#9AA6B2] hover:text-[#E6EEF2]
                 border border-[#374151] hover:border-[#4b5563]
                 transition-all
@@ -93,7 +99,7 @@ export default function AddServerModal({ onClose, onCreated }) {
               type="submit"
               disabled={loading}
               className={`
-                app-button-sm text-sm font-medium
+                px-4 py-2 rounded-lg text-sm font-medium
                 bg-[#3f51b5] hover:bg-[#3949a3] text-white
                 transition-all
                 ${loading ? 'opacity-70 cursor-not-allowed' : ''}
