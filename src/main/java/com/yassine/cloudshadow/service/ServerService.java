@@ -170,7 +170,8 @@ public class ServerService {
                 .token(server.getToken())
                 .companyId(server.getCompany().getId())
                 .createdAt(server.getCreatedAt())
-                .installInstructions(instructions)  // null on list/get
+                .lastSeen(server.getLastSeen())          // ← ADD THIS LINE
+                .installInstructions(instructions)
                 .build();
     }
 }

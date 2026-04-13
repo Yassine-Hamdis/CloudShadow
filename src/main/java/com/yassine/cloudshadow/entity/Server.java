@@ -29,10 +29,20 @@ public class Server {
     @Column(name = "created_at")
     private LocalDateTime createdAt;
 
-    @OneToMany(mappedBy = "server", cascade = CascadeType.ALL, fetch = FetchType.LAZY)
+    // ─── NEW: tracks last metric received time ─────────────────────────
+    // Updated every time agent sends a metric
+    // Used by scheduler to detect offline servers
+    @Column(name = "last_seen")
+    private LocalDateTime lastSeen;
+
+    @OneToMany(mappedBy = "server",
+            cascade = CascadeType.ALL,
+            fetch = FetchType.LAZY)
     private List<Metric> metrics;
 
-    @OneToMany(mappedBy = "server", cascade = CascadeType.ALL, fetch = FetchType.LAZY)
+    @OneToMany(mappedBy = "server",
+            cascade = CascadeType.ALL,
+            fetch = FetchType.LAZY)
     private List<Alert> alerts;
 
     @PrePersist

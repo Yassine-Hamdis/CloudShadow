@@ -8,7 +8,7 @@ import org.springframework.stereotype.Component;
 @Component
 public class InstallInstructionsGenerator {
 
-    @Value("${cloudshadow.agent.download-url:https://github.com/cloudshadow/agent}")
+    @Value("${cloudshadow.agent.download-url:https://github.com/Yassine-Hamdis/cloudshadow-agent}")
     private String agentDownloadUrl;
 
     /**
@@ -88,14 +88,11 @@ public class InstallInstructionsGenerator {
                 # ══════════════════════════════════════════════════
                 \s
                 # ── Step 1: Download the agent ──
-                curl -O %s/releases/latest/download/cloudshadow-agent.tar.gz
+                curl -LO %s/releases/latest/download/cloudshadow-agent.tar.gz
                 tar -xzf cloudshadow-agent.tar.gz
                 cd cloudshadow-agent
                 \s
-                # ── Step 2: Install Python dependencies ──
-                pip3 install psutil requests python-dotenv cryptography
-                \s
-                # ── Step 3: One-command install ──
+                # ── Step 2: One-command install ( RECOMMENDED )──
                 bash install.sh \\
                   --token "%s" \\
                   --url "%s" \\
@@ -106,14 +103,14 @@ public class InstallInstructionsGenerator {
                 export CLOUDSHADOW_BACKEND_URL="%s"
                 python3 agent.py
                 \s
-                # ── Step 4: Verify agent is running ──
+                # ── Step 3: Verify agent is running ──
                 sudo systemctl status cloudshadow-agent
                 \s
-                # ── Step 5: View live logs ──
+                # ── Step 4: View live logs ──
                 sudo journalctl -u cloudshadow-agent -f
                 \s
                 # ══════════════════════════════════════════════════
-                # Useful commands:
+                # ⚙️ Useful commands:
                 # Stop  → sudo systemctl stop cloudshadow-agent
                 # Start → sudo systemctl start cloudshadow-agent
                 # Logs  → sudo journalctl -u cloudshadow-agent -f

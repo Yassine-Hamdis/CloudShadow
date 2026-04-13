@@ -1,6 +1,7 @@
 package com.yassine.cloudshadow.dto.request;
 
 
+import com.fasterxml.jackson.annotation.JsonProperty;
 import jakarta.validation.constraints.Max;
 import jakarta.validation.constraints.Min;
 import jakarta.validation.constraints.NotBlank;
@@ -29,6 +30,9 @@ public class MetricRequest {
     private Float disk;
 
     // Network — optional (KB/s)
+    @JsonProperty("network_in")
     private Float networkIn  = 0.0f;
+
+    @JsonProperty("network_out")
     private Float networkOut = 0.0f;
 }

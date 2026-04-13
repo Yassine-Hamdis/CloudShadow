@@ -1,6 +1,5 @@
 package com.yassine.cloudshadow.config;
 
-
 import com.yassine.cloudshadow.security.JwtAuthFilter;
 import com.yassine.cloudshadow.security.CustomUserDetailsService;
 import lombok.RequiredArgsConstructor;
@@ -9,6 +8,7 @@ import org.springframework.context.annotation.Configuration;
 import org.springframework.security.authentication.AuthenticationManager;
 import org.springframework.security.authentication.AuthenticationProvider;
 import org.springframework.security.authentication.dao.DaoAuthenticationProvider;
+import org.springframework.security.config.Customizer;
 import org.springframework.security.config.annotation.authentication.configuration.AuthenticationConfiguration;
 import org.springframework.security.config.annotation.method.configuration.EnableMethodSecurity;
 import org.springframework.security.config.annotation.web.builders.HttpSecurity;
@@ -28,12 +28,14 @@ public class SecurityConfig {
     private final JwtAuthFilter jwtAuthFilter;
     private final CustomUserDetailsService userDetailsService;
 
-    // ─── Security Filter Chain ────────────────────────────────────────────
     @Bean
     public SecurityFilterChain securityFilterChain(HttpSecurity http)
             throws Exception {
 
         http
+                // ← ADD THIS — tells Spring Security to use your CorsFilter bean
+                .cors(Customizer.withDefaults())
+
                 .csrf(csrf -> csrf.disable())
 
                 .authorizeHttpRequests(auth -> auth
@@ -43,8 +45,8 @@ public class SecurityConfig {
                                 "/api/auth/register",
                                 "/api/auth/login",
                                 "/api/metrics",
-                                "/ws/**",              // ← WebSocket handshake
-                                "/ws/info/**"          // ← SockJS info endpoint
+                                "/ws/**",
+                                "/ws/info/**"
                         ).permitAll()
 
                         // ── Admin only ──
@@ -57,15 +59,12 @@ public class SecurityConfig {
                         .anyRequest().authenticated()
                 )
 
-                // ── Stateless session (JWT) ──
                 .sessionManagement(session ->
                         session.sessionCreationPolicy(SessionCreationPolicy.STATELESS)
                 )
 
-                // ── Auth provider ──
                 .authenticationProvider(authenticationProvider())
 
-                // ── Add JWT filter before Spring's auth filter ──
                 .addFilterBefore(
                         jwtAuthFilter,
                         UsernamePasswordAuthenticationFilter.class
@@ -74,23 +73,18 @@ public class SecurityConfig {
         return http.build();
     }
 
-    // ─── Password Encoder (BCrypt) ────────────────────────────────────────
     @Bean
     public PasswordEncoder passwordEncoder() {
         return new BCryptPasswordEncoder();
     }
 
-    // ─── Authentication Provider ──────────────────────────────────────────
     @Bean
     public AuthenticationProvider authenticationProvider() {
-        // In Spring Security 6 the no-arg constructor and setUserDetailsService(...) were removed.
-        // Pass the UserDetailsService into the constructor instead.
         DaoAuthenticationProvider provider = new DaoAuthenticationProvider(userDetailsService);
         provider.setPasswordEncoder(passwordEncoder());
         return provider;
     }
 
-    // ─── Authentication Manager ───────────────────────────────────────────
     @Bean
     public AuthenticationManager authenticationManager(
             AuthenticationConfiguration config

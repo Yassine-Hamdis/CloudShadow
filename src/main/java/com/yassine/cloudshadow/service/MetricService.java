@@ -25,9 +25,9 @@ public class MetricService {
     private final ServerRepository serverRepository;
     private final AlertService alertService;
     private final AiService aiService;
-    private final WebSocketService webSocketService;  // ← NEW
+    private final WebSocketService webSocketService;
 
-    // ─── Receive Metrics from Agent ───────────────────────────────────────
+    // ─── Receive Metrics from Agent ────────────────────────────────────
     @Transactional
     public void receiveMetrics(MetricRequest request) {
 
@@ -37,7 +37,20 @@ public class MetricService {
                         new UnauthorizedException("Invalid server token")
                 );
 
-        // 2. Build and save Metric
+        // 2. Track online/offline transition ───────────────────────────
+        // Check if this is the first metric after being offline/new
+        // A server is considered "coming online" if:
+        // - lastSeen is null (never sent a metric before)
+        // - lastSeen is older than 5 minutes (was offline)
+        boolean wasOffline = server.getLastSeen() == null ||
+                server.getLastSeen()
+                        .isBefore(LocalDateTime.now().minusMinutes(5));
+
+        // 3. Update lastSeen timestamp ──────────────────────────────────
+        server.setLastSeen(LocalDateTime.now());
+        serverRepository.save(server);
+
+        // 4. Build and save Metric
         Metric metric = Metric.builder()
                 .server(server)
                 .cpu(request.getCpu())
@@ -48,24 +61,33 @@ public class MetricService {
                 .build();
         metricRepository.save(metric);
 
-        // 3. Map to response
+        // 5. Map to response
         MetricResponse metricResponse = mapToResponse(metric);
 
-        // 4. Push metric to frontend via WebSocket ── NEW
-        // Company ID extracted from server → no trust issues
+        // 6. Push metric to frontend via WebSocket
         Long companyId = server.getCompany().getId();
         webSocketService.pushMetric(metricResponse, companyId);
 
-        // 5. Send to AI for analysis
+        // 7. Push SERVER_ONLINE if server was previously offline ────────
+        if (wasOffline) {
+            webSocketService.pushServerOnline(
+                    server.getId(),
+                    server.getName(),
+                    companyId,
+                    server.getLastSeen()
+            );
+        }
+
+        // 8. Send to AI for analysis
         AiService.AiOutput aiOutput = aiService.analyze(metric);
 
-        // 6. If anomaly detected → create alert + push via WebSocket
+        // 9. If anomaly detected → create alert + push via WebSocket
         if (aiOutput.isAnomaly()) {
             alertService.createAlert(server, aiOutput);
         }
     }
 
-    // ─── Get All Metrics for Company ──────────────────────────────────────
+    // ─── Get All Metrics for Company ───────────────────────────────────
     public List<MetricResponse> getMetricsByCompany(Long companyId) {
         return metricRepository.findAllByCompanyId(companyId)
                 .stream()
@@ -73,15 +95,14 @@ public class MetricService {
                 .collect(Collectors.toList());
     }
 
-    // ─── Get Metrics for a Specific Server ───────────────────────────────
+    // ─── Get Metrics for a Specific Server ─────────────────────────────
     public List<MetricResponse> getMetricsByServer(
             Long serverId, Long companyId) {
 
         Server server = serverRepository.findById(serverId)
                 .orElseThrow(() ->
                         new ResourceNotFoundException(
-                                "Server not found: " + serverId
-                        )
+                                "Server not found: " + serverId)
                 );
 
         if (!server.getCompany().getId().equals(companyId)) {
@@ -96,7 +117,7 @@ public class MetricService {
                 .collect(Collectors.toList());
     }
 
-    // ─── Get Metrics by Time Range ────────────────────────────────────────
+    // ─── Get Metrics by Time Range ─────────────────────────────────────
     public List<MetricResponse> getMetricsByCompanyAndTimeRange(
             Long companyId,
             LocalDateTime from,
@@ -109,15 +130,14 @@ public class MetricService {
                 .collect(Collectors.toList());
     }
 
-    // ─── Get Latest Metric per Server ─────────────────────────────────────
+    // ─── Get Latest Metric per Server ──────────────────────────────────
     public MetricResponse getLatestMetricByServer(
             Long serverId, Long companyId) {
 
         Server server = serverRepository.findById(serverId)
                 .orElseThrow(() ->
                         new ResourceNotFoundException(
-                                "Server not found: " + serverId
-                        )
+                                "Server not found: " + serverId)
                 );
 
         if (!server.getCompany().getId().equals(companyId)) {
@@ -136,7 +156,7 @@ public class MetricService {
         return mapToResponse(metric);
     }
 
-    // ─── Map Entity → Response ────────────────────────────────────────────
+    // ─── Map Entity → Response ─────────────────────────────────────────
     private MetricResponse mapToResponse(Metric metric) {
         return MetricResponse.builder()
                 .id(metric.getId())
