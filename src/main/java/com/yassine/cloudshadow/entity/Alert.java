@@ -34,6 +34,26 @@ public class Alert {
     @Column(nullable = false)
     private LocalDateTime timestamp;
 
+    // ─── NEW: AI fields ──────────────────────────────────────────────────
+
+    // false = threshold alert (AiService)
+    // true  = AI pattern alert (AiAlertService)
+    @Column(name = "is_ai_generated")
+    @Builder.Default
+    private Boolean isAiGenerated = false;
+
+    // 0.0 - 1.0 (null for threshold alerts)
+    @Column(name = "confidence_score")
+    private Float confidenceScore;
+
+    // "25 minutes" / "2 hours" (null for threshold alerts)
+    @Column(name = "prediction_window")
+    private String predictionWindow;
+
+    // "Scale up server" (null for threshold alerts)
+    @Column(name = "recommended_action")
+    private String recommendedAction;
+
     @PrePersist
     public void prePersist() {
         this.timestamp = LocalDateTime.now();

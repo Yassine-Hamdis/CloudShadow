@@ -40,4 +40,15 @@ public interface MetricRepository extends JpaRepository<Metric, Long> {
     @Query("SELECT m FROM Metric m WHERE m.server.id = :serverId " +
             "ORDER BY m.timestamp DESC LIMIT 1")
     Metric findLatestByServerId(@Param("serverId") Long serverId);
+
+
+    // ── NEW: Last N metrics for AI analysis ──────────────────────────────
+    // Used by AiAlertService to get recent history per server
+    // Native query because JPQL doesn't support LIMIT with parameters
+    @Query(value = "SELECT * FROM metrics WHERE server_id = :serverId " +
+            "ORDER BY timestamp DESC LIMIT :limit",
+            nativeQuery = true)
+    List<Metric> findLastNByServerId(
+            @Param("serverId") Long serverId,
+            @Param("limit") int limit);
 }

@@ -123,6 +123,11 @@ public class AlertService {
                 .severity(alert.getSeverity())
                 .message(alert.getMessage())
                 .timestamp(alert.getTimestamp())
+                // ── NEW: AI fields (null for threshold alerts) ────────────
+                .isAiGenerated(alert.getIsAiGenerated())
+                .confidenceScore(alert.getConfidenceScore())
+                .predictionWindow(alert.getPredictionWindow())
+                .recommendedAction(alert.getRecommendedAction())
                 .build();
     }
 }

@@ -20,4 +20,11 @@ public class AlertResponse {
     private Severity severity;      // WARNING / CRITICAL
     private String message;
     private LocalDateTime timestamp;
+
+    // ─── NEW: AI fields ──────────────────────────────────────────────────
+    // null for threshold alerts, populated for AI alerts
+    private Boolean isAiGenerated;
+    private Float confidenceScore;
+    private String predictionWindow;
+    private String recommendedAction;
 }
