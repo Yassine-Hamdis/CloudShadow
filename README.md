@@ -1,4 +1,8 @@
-// Request (from Spring Boot)
+# Application Analyzer
+
+## Request (from Spring Boot)
+```json
+// Request (from Spring Boot) {
 {
   "serverId": 1,
   "serverName": "app-server-01",
@@ -19,7 +23,6 @@
       "networkOut": 210.0,
       "timestamp": "2024-01-15T14:00:20"
     },
-    // ... last 30 metrics
     {
       "cpu": 78.0,
       "memory": 75.0,
