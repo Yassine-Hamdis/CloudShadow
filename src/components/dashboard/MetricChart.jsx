@@ -44,10 +44,12 @@ export default function MetricChart({
   yUnit = '%',
   loading = false,
 }) {
-  const formatted = data.map((d) => ({
-    ...d,
-    time: d.timestamp,
-  }))
+  const formatted = [...data]
+    .sort((a, b) => new Date(a.timestamp).getTime() - new Date(b.timestamp).getTime())
+    .map((d) => ({
+      ...d,
+      time: d.timestamp,
+    }))
 
   return (
     <div className="bg-[#1f2937] border border-[#374151] rounded-2xl p-5 shadow-sm">

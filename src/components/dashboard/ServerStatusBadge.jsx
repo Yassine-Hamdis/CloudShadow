@@ -11,10 +11,15 @@ import { formatDistanceToNow } from 'date-fns'
 export default function ServerStatusBadge({ serverId, lastSeen: initialLastSeen }) {
   const [lastSeen, setLastSeen] = useState(initialLastSeen)
 
+  // Keep local state in sync when parent selects a different server.
+  useEffect(() => {
+    setLastSeen(initialLastSeen)
+  }, [serverId, initialLastSeen])
+
   // Listen for real-time status changes via custom event
   useEffect(() => {
     const handler = (e) => {
-      if (e.detail.serverId === serverId) {
+      if (Number(e.detail.serverId) === Number(serverId)) {
         setLastSeen(e.detail.lastSeen)
       }
     }

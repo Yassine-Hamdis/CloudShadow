@@ -41,7 +41,7 @@ api.interceptors.response.use(
     }
 
     if (status === 403) {
-      toast.error('Access denied. Insufficient permissions.')
+      // Permission handling is done at page/feature level to avoid noisy global toasts.
       return Promise.reject(error)
     }
 

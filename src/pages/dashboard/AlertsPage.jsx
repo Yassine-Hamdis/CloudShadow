@@ -1,12 +1,36 @@
-import { useState, useMemo } from 'react'
+import { useEffect, useState, useMemo } from 'react'
 import { ChevronLeft, ChevronRight, Filter } from 'lucide-react'
 import AlertCard       from '../../components/dashboard/AlertCard'
 import useAlertsStore  from '../../store/alertsStore'
+import { getAlerts } from '../../api/alerts'
 
 const PER_PAGE = 20
 
 export default function AlertsPage() {
-  const { alerts } = useAlertsStore()
+  const { alerts, setAlerts } = useAlertsStore()
+
+  useEffect(() => {
+    if (alerts.length > 0) return
+
+    let isActive = true
+
+    const loadAlerts = async () => {
+      try {
+        const response = await getAlerts()
+        if (isActive) {
+          setAlerts(response)
+        }
+      } catch {
+        // Keep the current empty state if the fetch fails.
+      }
+    }
+
+    loadAlerts()
+
+    return () => {
+      isActive = false
+    }
+  }, [alerts.length, setAlerts])
 
   const [severity, setSeverity] = useState('ALL')
   const [type, setType]         = useState('ALL')

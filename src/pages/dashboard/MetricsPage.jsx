@@ -1,12 +1,13 @@
-import { useEffect, useState, useCallback } from 'react'
-import { subHours, subDays, formatDistanceToNow } from 'date-fns'
-import { Play, Pause, RefreshCw } from 'lucide-react'
+import { useEffect, useState, useCallback, useMemo } from 'react'
+import { formatDistanceToNow } from 'date-fns'
+import { Pause, RefreshCw, AlertCircle } from 'lucide-react'
 import toast from 'react-hot-toast'
 import MetricChart     from '../../components/dashboard/MetricChart'
 import LoadingSpinner  from '../../components/common/LoadingSpinner'
 import useMetricsStore from '../../store/metricsStore'
+import useAuthStore    from '../../store/authStore'
 import { getServers }  from '../../api/servers'
-import { getMetricsByServer, getMetricsByRange, getLatestMetric } from '../../api/metrics'
+import { getMetricsByServer, getLatestMetric } from '../../api/metrics'
 
 const RANGES = [
   { label: '1h',  hours: 1  },
@@ -17,6 +18,7 @@ const RANGES = [
 
 export default function MetricsPage() {
   const { metricsByServer, latestByServer, setMetrics, setLatest } = useMetricsStore()
+  const { role } = useAuthStore()
 
   const [servers, setServers]       = useState([])
   const [selectedId, setSelectedId] = useState(null)
@@ -24,6 +26,14 @@ export default function MetricsPage() {
   const [live, setLive]             = useState(true)
   const [loading, setLoading]       = useState(false)
   const [loadingServers, setLoadingServers] = useState(true)
+  const [serverStatuses, setServerStatuses] = useState({})
+  const [serverNamesById, setServerNamesById] = useState({})
+
+  const getMs = (timestamp) => new Date(timestamp).getTime()
+  const isFresh = (timestamp, maxAgeMs = 5 * 60 * 1000) => {
+    const ts = getMs(timestamp)
+    return Number.isFinite(ts) && Date.now() - ts < maxAgeMs
+  }
 
   // ── Load server list ────────────────────────────────────────────────────
   useEffect(() => {
@@ -32,14 +42,120 @@ export default function MetricsPage() {
       try {
         const srvs = await getServers()
         setServers(srvs)
-        if (srvs.length > 0) setSelectedId(srvs[0].id)
+        setServerNamesById(
+          Object.fromEntries(srvs.map((s) => [Number(s.id), s.name]))
+        )
+        if (srvs.length > 0) {
+          setSelectedId(srvs[0].id)
+        }
+        const statuses = {}
+        srvs.forEach(s => {
+          statuses[s.id] = s.lastSeen ? {
+            lastSeen: s.lastSeen,
+            isOnline: (Date.now() - new Date(s.lastSeen).getTime()) < 5 * 60 * 1000
+          } : { lastSeen: null, isOnline: false }
+        })
+        setServerStatuses(statuses)
       } catch {
-        toast.error('Failed to load servers')
+        if (role === 'ADMIN') {
+          toast.error('Failed to load servers')
+        }
       } finally {
         setLoadingServers(false)
       }
     }
     load()
+  }, [role])
+
+  const serverOptions = useMemo(() => {
+    const map = new Map()
+
+    const deriveName = (numericId) => {
+      const latest = latestByServer[numericId] || latestByServer[String(numericId)]
+      if (latest?.serverName) return latest.serverName
+      if (latest?.name) return latest.name
+
+      const history = metricsByServer[numericId] || metricsByServer[String(numericId)] || []
+      const namedMetric = [...history].reverse().find((m) => m.serverName || m.name)
+      if (namedMetric?.serverName) return namedMetric.serverName
+      if (namedMetric?.name) return namedMetric.name
+
+      if (serverNamesById[numericId]) return serverNamesById[numericId]
+      return `Server #${numericId}`
+    }
+
+    servers.forEach((s) => {
+      map.set(Number(s.id), {
+        id: Number(s.id),
+        name: s.name || deriveName(Number(s.id)),
+        lastSeen: s.lastSeen ?? null,
+      })
+    })
+
+    Object.keys(metricsByServer).forEach((id) => {
+      const numericId = Number(id)
+      if (!map.has(numericId)) {
+        map.set(numericId, {
+          id: numericId,
+          name: deriveName(numericId),
+          lastSeen: null,
+        })
+      }
+    })
+
+    Object.keys(latestByServer).forEach((id) => {
+      const numericId = Number(id)
+      if (!map.has(numericId)) {
+        map.set(numericId, {
+          id: numericId,
+          name: deriveName(numericId),
+          lastSeen: latestByServer[id]?.timestamp ?? null,
+        })
+      }
+    })
+
+    return Array.from(map.values()).sort((a, b) => a.name.localeCompare(b.name))
+  }, [servers, metricsByServer, latestByServer, serverNamesById])
+
+  useEffect(() => {
+    if (!serverOptions.length) {
+      if (selectedId !== null) {
+        setSelectedId(null)
+      }
+      return
+    }
+
+    if (selectedId === null || !serverOptions.some((s) => s.id === selectedId)) {
+      setSelectedId(serverOptions[0].id)
+    }
+  }, [serverOptions, selectedId])
+
+  // ── Listen for real-time server status changes ───────────────────────
+  useEffect(() => {
+    const handler = (e) => {
+      const { serverId, lastSeen, serverName, status } = e.detail
+      const numericId = Number(serverId)
+      setServerStatuses(prev => ({
+        ...prev,
+        [numericId]: {
+          lastSeen: lastSeen || prev[numericId]?.lastSeen || null,
+          isOnline:
+            status === 'ONLINE'
+              ? true
+              : status === 'OFFLINE'
+              ? false
+              : isFresh(lastSeen || prev[numericId]?.lastSeen),
+        }
+      }))
+      if (serverName) {
+        setServerNamesById((prev) => ({
+          ...prev,
+          [numericId]: serverName,
+        }))
+      }
+    }
+    window.addEventListener('server-status-change', handler)
+    return () => window.removeEventListener('server-status-change', handler)
   }, [])
 
   // ── Fetch metrics for selected server + range ───────────────────────────
@@ -47,19 +163,14 @@ export default function MetricsPage() {
     if (!selectedId) return
     setLoading(true)
     try {
-      let data
-      if (range.hours <= 24) {
-        const from = subHours(new Date(), range.hours).toISOString()
-        const to   = new Date().toISOString()
-        data = await getMetricsByRange(from, to)
-        // filter for selected server
-        data = data.filter((m) => m.serverId === selectedId)
-      } else {
-        const from = subDays(new Date(), range.hours / 24).toISOString()
-        const to   = new Date().toISOString()
-        data = await getMetricsByRange(from, to)
-        data = data.filter((m) => m.serverId === selectedId)
-      }
+      const nowMs = Date.now()
+      const fromMs = nowMs - (range.hours * 60 * 60 * 1000)
+
+      const allServerMetrics = await getMetricsByServer(selectedId)
+      const data = allServerMetrics.filter((m) => {
+        const ts = getMs(m.timestamp)
+        return Number.isFinite(ts) && ts >= fromMs && ts <= nowMs + 60_000
+      })
       setMetrics(selectedId, data)
 
       // also fetch latest
@@ -78,11 +189,29 @@ export default function MetricsPage() {
     fetchMetrics()
   }, [fetchMetrics])
 
+  // ── Poll when live mode is enabled ─────────────────────────────────────
+  useEffect(() => {
+    if (!live || !selectedId) return
+
+    const latestMetric = latestByServer[selectedId]
+    const hasRecentMetric = isFresh(latestMetric?.timestamp)
+    const isOnline = serverStatuses[selectedId]?.isOnline ?? hasRecentMetric
+    if (!isOnline) return
+
+    const id = setInterval(() => {
+      fetchMetrics()
+    }, 30000)
+
+    return () => clearInterval(id)
+  }, [live, selectedId, fetchMetrics, serverStatuses, latestByServer])
+
+  // ── Check if selected server is online ───────────────────────────────
+  const selectedServerStatus = selectedId ? serverStatuses[selectedId] : null
+  const hasRecentMetric = selectedId ? isFresh(latestByServer[selectedId]?.timestamp) : false
+  const isSelectedOnline = selectedServerStatus?.isOnline ?? hasRecentMetric
+
   const metrics = selectedId ? (metricsByServer[selectedId] || []) : []
   const latest  = selectedId ? latestByServer[selectedId] : null
-
-  // Network chart needs different domain
-  const hasNetwork = metrics.some((m) => m.networkIn || m.networkOut)
 
   return (
     <div className="space-y-6">
@@ -112,8 +241,9 @@ export default function MetricsPage() {
                 text-sm text-[#E6EEF2] px-3 py-2.5
                 focus:outline-none focus:ring-2 focus:ring-[#3f51b5]/45
               "
+              disabled={serverOptions.length === 0}
             >
-              {servers.map((s) => (
+              {serverOptions.map((s) => (
                 <option key={s.id} value={s.id}>{s.name}</option>
               ))}
             </select>
@@ -144,14 +274,20 @@ export default function MetricsPage() {
             className={`
               flex items-center gap-2 app-button-sm text-xs font-medium
               border transition-all
-              ${live
+              ${live && isSelectedOnline
                 ? 'border-[#4CAF50] text-[#4CAF50] bg-[#4CAF50]/10'
+                : live && !isSelectedOnline
+                ? 'border-[#E53935]/50 text-[#E53935] bg-[#E53935]/10 cursor-not-allowed opacity-60'
                 : 'border-[#374151] text-[#9AA6B2] hover:border-[#4b5563]'
               }
             `}
+            disabled={!isSelectedOnline}
+            title={!isSelectedOnline ? 'Cannot poll offline server' : 'Live updates enabled'}
           >
-            {live
+            {live && isSelectedOnline
               ? <><span className="w-1.5 h-1.5 rounded-full bg-[#4CAF50] animate-pulse" />Live</>
+              : live && !isSelectedOnline
+              ? <><AlertCircle className="w-3 h-3" />Offline</>
               : <><Pause className="w-3 h-3" />Paused</>
             }
           </button>

@@ -1,12 +1,14 @@
 import { useEffect, useState, useMemo } from 'react'
 import { Link }                          from 'react-router-dom'
 import { Cpu, HardDrive, MemoryStick, AlertTriangle, ArrowRight } from 'lucide-react'
+import toast from 'react-hot-toast'
 import StatCard        from '../../components/dashboard/StatCard'
 import MetricChart     from '../../components/dashboard/MetricChart'
 import AlertCard       from '../../components/dashboard/AlertCard'
 import ServerStatusBadge from '../../components/dashboard/ServerStatusBadge'
 import useMetricsStore from '../../store/metricsStore'
 import useAlertsStore  from '../../store/alertsStore'
+import useAuthStore    from '../../store/authStore'
 import { getServers }           from '../../api/servers'
 import { getLatestMetric, getMetricsByServer } from '../../api/metrics'
 
@@ -19,11 +21,21 @@ const getMetricStatus = (value) => {
 export default function OverviewPage() {
   const { metricsByServer, latestByServer, setMetrics, setLatest } = useMetricsStore()
   const { alerts, criticalCount } = useAlertsStore()
+  const { role } = useAuthStore()
 
   const [servers, setServers]         = useState([])
   const [selectedId, setSelectedId]   = useState(null)
   const [loading, setLoading]         = useState(true)
   const [loadingCharts, setLoadingCharts] = useState(false)
+  const [serverNamesById, setServerNamesById] = useState({})
+  const [serverStatusesById, setServerStatusesById] = useState({})
+
+  const getMs = (value) => new Date(value).getTime()
+
+  const isRecent = (value, maxAgeMs = 5 * 60 * 1000) => {
+    const ts = getMs(value)
+    return Number.isFinite(ts) && Date.now() - ts < maxAgeMs
+  }
 
   // ── Load servers + their latest metrics ──────────────────────────────────
   useEffect(() => {
@@ -32,12 +44,29 @@ export default function OverviewPage() {
       try {
         const srvs = await getServers()
         setServers(srvs)
+        setServerNamesById(
+          Object.fromEntries(srvs.map((s) => [Number(s.id), s.name]))
+        )
+        setServerStatusesById(
+          Object.fromEntries(
+            srvs.map((s) => [
+              Number(s.id),
+              {
+                lastSeen: s.lastSeen ?? null,
+                status: isRecent(s.lastSeen) ? 'ONLINE' : 'OFFLINE',
+              },
+            ])
+          )
+        )
+
+        const latestMap = {}
 
         // Fetch latest metric for each server in parallel
         await Promise.allSettled(
           srvs.map(async (s) => {
             try {
               const latest = await getLatestMetric(s.id)
+              latestMap[s.id] = latest
               setLatest(s.id, latest)
             } catch { /* server may have no metrics */ }
           })
@@ -46,34 +75,151 @@ export default function OverviewPage() {
         // Auto-select worst performing server (highest CPU)
         if (srvs.length > 0) {
           const worst = srvs.reduce((prev, curr) => {
-            const prevCpu = latestByServer[prev.id]?.cpu ?? 0
-            const currCpu = latestByServer[curr.id]?.cpu ?? 0
+            const prevCpu = latestMap[prev.id]?.cpu ?? 0
+            const currCpu = latestMap[curr.id]?.cpu ?? 0
             return currCpu > prevCpu ? curr : prev
           })
           setSelectedId(worst.id)
+        }
+      } catch {
+        if (role === 'ADMIN') {
+          toast.error('Failed to load servers')
         }
       } finally {
         setLoading(false)
       }
     }
     load()
+  }, [role])
+
+  const serverOptions = useMemo(() => {
+    const map = new Map()
+
+    const deriveName = (numericId) => {
+      const latest = latestByServer[numericId] || latestByServer[String(numericId)]
+      if (latest?.serverName) return latest.serverName
+      if (latest?.name) return latest.name
+
+      const history = metricsByServer[numericId] || metricsByServer[String(numericId)] || []
+      const namedMetric = [...history].reverse().find((m) => m.serverName || m.name)
+      if (namedMetric?.serverName) return namedMetric.serverName
+      if (namedMetric?.name) return namedMetric.name
+
+      if (serverNamesById[numericId]) return serverNamesById[numericId]
+      return `Server #${numericId}`
+    }
+
+    servers.forEach((s) => {
+      map.set(Number(s.id), {
+        id: Number(s.id),
+        name: s.name || deriveName(Number(s.id)),
+        lastSeen: s.lastSeen ?? null,
+      })
+    })
+
+    Object.keys(latestByServer).forEach((id) => {
+      const numericId = Number(id)
+      if (!map.has(numericId)) {
+        map.set(numericId, {
+          id: numericId,
+          name: deriveName(numericId),
+          lastSeen: latestByServer[id]?.timestamp ?? null,
+        })
+      }
+    })
+
+    Object.keys(metricsByServer).forEach((id) => {
+      const numericId = Number(id)
+      if (!map.has(numericId)) {
+        map.set(numericId, {
+          id: numericId,
+          name: deriveName(numericId),
+          lastSeen: null,
+        })
+      }
+    })
+
+    Object.keys(serverStatusesById).forEach((id) => {
+      const numericId = Number(id)
+      if (!map.has(numericId)) {
+        map.set(numericId, {
+          id: numericId,
+          name: deriveName(numericId),
+          lastSeen: serverStatusesById[numericId]?.lastSeen ?? null,
+        })
+      }
+    })
+
+    return Array.from(map.values()).sort((a, b) => a.name.localeCompare(b.name))
+  }, [servers, latestByServer, metricsByServer, serverNamesById, serverStatusesById])
+
+  useEffect(() => {
+    const handler = (e) => {
+      const { serverId, serverName, lastSeen, status } = e.detail
+      const numericId = Number(serverId)
+      if (serverName) {
+        setServerNamesById((prev) => ({
+          ...prev,
+          [numericId]: serverName,
+        }))
+      }
+
+      setServerStatusesById((prev) => ({
+        ...prev,
+        [numericId]: {
+          lastSeen: lastSeen || prev[numericId]?.lastSeen || null,
+          status: status || prev[numericId]?.status || null,
+        },
+      }))
+    }
+
+    window.addEventListener('server-status-change', handler)
+    return () => window.removeEventListener('server-status-change', handler)
   }, [])
+
+  useEffect(() => {
+    if (!serverOptions.length) {
+      if (selectedId !== null) {
+        setSelectedId(null)
+      }
+      return
+    }
+
+    if (selectedId === null || !serverOptions.some((s) => s.id === selectedId)) {
+      setSelectedId(serverOptions[0].id)
+    }
+  }, [serverOptions, selectedId])
 
   // ── When selectedId changes, load chart data ──────────────────────────────
   useEffect(() => {
     if (!selectedId) return
-    if (metricsByServer[selectedId]?.length > 0) return  // already loaded
 
-    const loadChartData = async () => {
-      setLoadingCharts(true)
+    const loadChartData = async (showSpinner = true) => {
+      if (showSpinner) setLoadingCharts(true)
       try {
         const metrics = await getMetricsByServer(selectedId)
         setMetrics(selectedId, metrics)
+
+        try {
+          const latest = await getLatestMetric(selectedId)
+          setLatest(selectedId, latest)
+        } catch {
+          // Keep chart even if latest endpoint has no data yet.
+        }
       } catch { /* empty */ }
-      finally { setLoadingCharts(false) }
+      finally {
+        if (showSpinner) setLoadingCharts(false)
+      }
     }
-    loadChartData()
-  }, [selectedId])
+
+    loadChartData(true)
+
+    const id = setInterval(() => {
+      loadChartData(false)
+    }, 10000)
+
+    return () => clearInterval(id)
+  }, [selectedId, setMetrics, setLatest])
 
   // ── Compute averages across all servers ─────────────────────────────────
   const averages = useMemo(() => {
@@ -88,17 +234,41 @@ export default function OverviewPage() {
 
   // ── Worst server (highest CPU) ───────────────────────────────────────────
   const worstServer = useMemo(() => {
-    if (!servers.length) return null
-    return servers.reduce((prev, curr) => {
+    if (!serverOptions.length) return null
+    return serverOptions.reduce((prev, curr) => {
       const p = latestByServer[prev.id]?.cpu ?? 0
       const c = latestByServer[curr.id]?.cpu ?? 0
       return c > p ? curr : prev
     })
-  }, [servers, latestByServer])
+  }, [serverOptions, latestByServer])
 
   const selectedLatest  = selectedId ? latestByServer[selectedId]  : null
   const selectedMetrics = selectedId ? (metricsByServer[selectedId] || []) : []
-  const recentAlerts    = alerts.slice(0, 5)
+  const totalServers = serverOptions.length
+
+  const activeServers = useMemo(() => {
+    return serverOptions.filter((server) => {
+      const latest = latestByServer[server.id] || latestByServer[String(server.id)]
+      const history = metricsByServer[server.id] || metricsByServer[String(server.id)] || []
+      const latestHistoryTs = history.length ? history[history.length - 1]?.timestamp : null
+      const knownStatus = serverStatusesById[server.id]?.status
+
+      if (knownStatus === 'OFFLINE') return false
+      if (knownStatus === 'ONLINE') return true
+
+      return (
+        isRecent(server.lastSeen) ||
+        isRecent(latest?.timestamp) ||
+        isRecent(latestHistoryTs)
+      )
+    }).length
+  }, [serverOptions, latestByServer, metricsByServer, serverStatusesById])
+
+  const offlineServers = totalServers - activeServers
+
+  const recentAlerts = [...alerts]
+    .sort((a, b) => new Date(b.timestamp).getTime() - new Date(a.timestamp).getTime())
+    .slice(0, 5)
 
   return (
     <div className="space-y-6">
@@ -113,10 +283,14 @@ export default function OverviewPage() {
               Real-time view of your infrastructure, live metrics, and recent alerts.
             </p>
           </div>
-          <div className="grid grid-cols-2 gap-3 min-w-[220px] max-w-[260px] w-full sm:w-auto">
+          <div className="grid grid-cols-3 gap-3 min-w-[300px] max-w-[420px] w-full sm:w-auto">
             <div className="rounded-2xl bg-white/4 border border-white/6 p-3">
-              <p className="text-[11px] uppercase tracking-[0.2em] text-[#9AA6B2]">Servers</p>
-              <p className="text-xl font-semibold text-[#E6EEF2] mt-1">{servers.length}</p>
+              <p className="text-[11px] uppercase tracking-[0.2em] text-[#9AA6B2]">Active</p>
+              <p className="text-xl font-semibold text-[#4CAF50] mt-1">{activeServers}</p>
+            </div>
+            <div className="rounded-2xl bg-white/4 border border-white/6 p-3">
+              <p className="text-[11px] uppercase tracking-[0.2em] text-[#9AA6B2]">Offline</p>
+              <p className="text-xl font-semibold text-[#E53935] mt-1">{offlineServers}</p>
             </div>
             <div className="rounded-2xl bg-white/4 border border-white/6 p-3">
               <p className="text-[11px] uppercase tracking-[0.2em] text-[#9AA6B2]">Critical</p>
@@ -134,7 +308,7 @@ export default function OverviewPage() {
           unit="%"
           icon={<Cpu className="w-5 h-5" />}
           status={averages.cpu !== null ? getMetricStatus(averages.cpu) : 'normal'}
-          subtitle={`Across ${servers.length} servers`}
+          subtitle={`Across ${totalServers} servers`}
           loading={loading}
         />
         <StatCard
@@ -143,7 +317,7 @@ export default function OverviewPage() {
           unit="%"
           icon={<MemoryStick className="w-5 h-5" />}
           status={averages.memory !== null ? getMetricStatus(averages.memory) : 'normal'}
-          subtitle={`Across ${servers.length} servers`}
+          subtitle={`Across ${totalServers} servers`}
           loading={loading}
         />
         <StatCard
@@ -152,7 +326,7 @@ export default function OverviewPage() {
           unit="%"
           icon={<HardDrive className="w-5 h-5" />}
           status={averages.disk !== null ? getMetricStatus(averages.disk) : 'normal'}
-          subtitle={`Across ${servers.length} servers`}
+          subtitle={`Across ${totalServers} servers`}
           loading={loading}
         />
         <StatCard
@@ -230,7 +404,7 @@ export default function OverviewPage() {
                 focus:outline-none focus:ring-2 focus:ring-[#3f51b5]
               "
             >
-              {servers.map((s) => (
+              {serverOptions.map((s) => (
                 <option key={s.id} value={s.id}>
                   {s.name}
                 </option>

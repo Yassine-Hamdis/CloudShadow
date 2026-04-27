@@ -33,7 +33,7 @@ export const useWebSocket = () => {
               const message = JSON.parse(frame.body)
 
               // Security: verify companyId matches
-              if (message.companyId !== companyId) return
+              if (Number(message.companyId) !== Number(companyId)) return
 
               if (message.type === 'NEW_METRIC') {
                 appendMetric(message.data)
@@ -51,7 +51,7 @@ export const useWebSocket = () => {
             try {
               const message = JSON.parse(frame.body)
 
-              if (message.companyId !== companyId) return
+              if (Number(message.companyId) !== Number(companyId)) return
 
               if (message.type === 'NEW_ALERT') {
                 const alert = message.data
@@ -91,7 +91,7 @@ export const useWebSocket = () => {
             try {
               const message = JSON.parse(frame.body)
 
-              if (message.companyId !== companyId) return
+              if (Number(message.companyId) !== Number(companyId)) return
 
               const { serverName, status } = message.data
 

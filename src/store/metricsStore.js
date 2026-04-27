@@ -1,8 +1,11 @@
 import { create } from 'zustand'
 
-const SLIDING_WINDOW = 30
+const LIVE_WINDOW = 300
 
-const useMetricsStore = create((set, get) => ({
+const byTimestampAsc = (a, b) =>
+  new Date(a.timestamp).getTime() - new Date(b.timestamp).getTime()
+
+const useMetricsStore = create((set) => ({
   // Map<serverId, MetricResponse[]>
   metricsByServer: {},
   // Map<serverId, MetricResponse>
@@ -13,7 +16,8 @@ const useMetricsStore = create((set, get) => ({
     set((state) => ({
       metricsByServer: {
         ...state.metricsByServer,
-        [serverId]: metrics.slice(-SLIDING_WINDOW),
+        // Keep the full fetched range so 1h/6h/24h/7d can render correctly.
+        [serverId]: [...metrics].sort(byTimestampAsc),
       },
     }))
   },
@@ -33,17 +37,15 @@ const useMetricsStore = create((set, get) => ({
     const { serverId } = metric
     set((state) => {
       const existing = state.metricsByServer[serverId] || []
-      const updated  = [...existing, metric]
+      const updated = [...existing, metric].sort(byTimestampAsc)
 
-      // Enforce sliding window
-      if (updated.length > SLIDING_WINDOW) {
-        updated.shift()
-      }
+      // Keep recent points during live updates to avoid unbounded growth.
+      const trimmed = updated.slice(-LIVE_WINDOW)
 
       return {
         metricsByServer: {
           ...state.metricsByServer,
-          [serverId]: updated,
+          [serverId]: trimmed,
         },
         latestByServer: {
           ...state.latestByServer,
