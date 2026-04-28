@@ -6,7 +6,9 @@ import useAuthStore          from '../store/authStore'
 import useMetricsStore       from '../store/metricsStore'
 import useAlertsStore        from '../store/alertsStore'
 
-const WS_URL = 'http://localhost:8080/ws'
+const WS_URL = import.meta.env.VITE_WS_URL || 
+               (window.location.origin.replace('http', 'ws') + '/ws') ||
+               'http://localhost:8080/ws'
 
 export const useWebSocket = () => {
   const clientRef = useRef(null)
