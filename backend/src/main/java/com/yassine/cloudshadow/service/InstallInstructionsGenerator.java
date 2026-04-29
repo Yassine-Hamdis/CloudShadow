@@ -164,7 +164,7 @@ public class InstallInstructionsGenerator {
                 # docker-compose.yml under "services:":
                 \s
                   cloudshadow-agent:
-                    image: cloudshadow/docker-agent:latest
+                    image: yacinham10/cloudshadow-docker-agent:latest
                     container_name: cloudshadow-agent
                     restart: unless-stopped
                     environment:
