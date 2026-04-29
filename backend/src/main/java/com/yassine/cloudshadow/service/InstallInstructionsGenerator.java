@@ -27,8 +27,7 @@ public class InstallInstructionsGenerator {
         return InstallInstructions.builder()
                 .tokenReminder(buildTokenReminder(token, serverName))
                 .envVariables(buildEnvVariables(token, backendUrl))
-                .normalServer(buildNormalServerInstructions(
-                        token, backendUrl))
+                .normalServer(buildNormalServerInstructions(token, backendUrl))
                 .docker(buildDockerInstructions(token, backendUrl))
                 .kubernetes(buildKubernetesInstructions(token, backendUrl))
                 .build();
@@ -58,7 +57,7 @@ public class InstallInstructionsGenerator {
     // ─────────────────────────────────────────────────────────────────────
     private String buildEnvVariables(String token, String backendUrl) {
         return String.format("""
-                # ── Set these environment variables on your server ──
+                # ── Normal Server Agent Variables ──────────────────
                 export CLOUDSHADOW_TOKEN="%s"
                 export CLOUDSHADOW_BACKEND_URL="%s"
                 export CLOUDSHADOW_INTERVAL="20"
@@ -68,7 +67,32 @@ public class InstallInstructionsGenerator {
                 echo 'export CLOUDSHADOW_TOKEN="%s"' >> ~/.bashrc
                 echo 'export CLOUDSHADOW_BACKEND_URL="%s"' >> ~/.bashrc
                 source ~/.bashrc
+                \s
+                # ── Docker / Kubernetes Agent Variables ─────────────
+                SERVER_TOKEN="%s"
+                # Your unique server token (do not share this)
+                \s
+                BACKEND_URL="%s"
+                # URL of your CloudShadow backend
+                \s
+                MONITOR_CONTAINER="your-container-name"
+                # Name of the Docker container to monitor
+                # Must match container_name in docker-compose
+                # or the container name in Kubernetes
+                \s
+                INTERVAL="20"
+                # How often to send metrics in seconds
+                # Minimum recommended: 10 — Default: 20
+                \s
+                # ══════════════════════════════════════════════════
+                # ⚠️  Security Notes:
+                # → Never commit SERVER_TOKEN to version control
+                # → Use Docker secrets or K8s secrets in production
+                # → Regenerate token from dashboard if compromised
+                # ══════════════════════════════════════════════════
                 """,
+                token,
+                backendUrl,
                 token,
                 backendUrl,
                 token,
@@ -92,7 +116,7 @@ public class InstallInstructionsGenerator {
                 tar -xzf cloudshadow-agent.tar.gz
                 cd cloudshadow-agent
                 \s
-                # ── Step 2: One-command install ( RECOMMENDED )──
+                # ── Step 2: One-command install ( RECOMMENDED ) ──
                 bash install.sh \\
                   --token "%s" \\
                   --url "%s" \\
@@ -110,7 +134,7 @@ public class InstallInstructionsGenerator {
                 sudo journalctl -u cloudshadow-agent -f
                 \s
                 # ══════════════════════════════════════════════════
-                # ⚙️ Useful commands:
+                # ⚙️  Useful commands:
                 # Stop  → sudo systemctl stop cloudshadow-agent
                 # Start → sudo systemctl start cloudshadow-agent
                 # Logs  → sudo journalctl -u cloudshadow-agent -f
@@ -125,35 +149,53 @@ public class InstallInstructionsGenerator {
     }
 
     // ─────────────────────────────────────────────────────────────────────
-    // DOCKER — Phase 2 (preview instructions)
+    // DOCKER — Sidecar Agent
     // ─────────────────────────────────────────────────────────────────────
     private String buildDockerInstructions(
             String token, String backendUrl) {
 
         return String.format("""
                 # ══════════════════════════════════════════════════
-                # 🐳 DOCKER — Container Agent (Phase 2)
+                # 🐳  DOCKER — CloudShadow Sidecar Agent
                 # ══════════════════════════════════════════════════
                 \s
-                # ── Run agent as Docker container ──
-                docker run -d \\
-                  --name cloudshadow-agent \\
-                  --restart unless-stopped \\
-                  -e CLOUDSHADOW_TOKEN="%s" \\
-                  -e CLOUDSHADOW_BACKEND_URL="%s" \\
-                  -e CLOUDSHADOW_INTERVAL="20" \\
-                  -v /var/run/docker.sock:/var/run/docker.sock \\
-                  cloudshadow/agent:latest
+                # ── Step 1: Add agent to your docker-compose.yml ──
+                # Copy and paste this block into your existing
+                # docker-compose.yml under "services:":
                 \s
-                # ── View agent logs ──
-                docker logs cloudshadow-agent -f
+                  cloudshadow-agent:
+                    image: cloudshadow/docker-agent:latest
+                    container_name: cloudshadow-agent
+                    restart: unless-stopped
+                    environment:
+                      SERVER_TOKEN: "%s"
+                      BACKEND_URL: "%s"
+                      MONITOR_CONTAINER: "your-container-name"
+                      INTERVAL: "20"
+                    volumes:
+                      - /var/run/docker.sock:/var/run/docker.sock
+                    depends_on:
+                      - your-container-name
                 \s
-                # ── Stop agent ──
-                docker stop cloudshadow-agent
+                # ── Step 2: Replace placeholders ──
+                # → Replace "your-container-name" with the name
+                #   of the container you want to monitor
+                #   Example: my-app, nginx, api-server
+                \s
+                # ── Step 3: Start the agent ──
+                docker-compose up -d cloudshadow-agent
+                \s
+                # ── Step 4: Verify agent is running ──
+                docker-compose ps cloudshadow-agent
+                \s
+                # ── Step 5: View live logs ──
+                docker-compose logs -f cloudshadow-agent
                 \s
                 # ══════════════════════════════════════════════════
-                # ⚠️  Docker agent coming in Phase 2
-                # Use Normal Server agent for now
+                # ⚙️  Useful commands:
+                # Stop  → docker-compose stop cloudshadow-agent
+                # Start → docker-compose start cloudshadow-agent
+                # Logs  → docker-compose logs -f cloudshadow-agent
                 # ══════════════════════════════════════════════════
                 """,
                 token,
@@ -162,42 +204,69 @@ public class InstallInstructionsGenerator {
     }
 
     // ─────────────────────────────────────────────────────────────────────
-    // KUBERNETES — Phase 3 (preview instructions)
+    // KUBERNETES — Sidecar Agent
     // ─────────────────────────────────────────────────────────────────────
     private String buildKubernetesInstructions(
             String token, String backendUrl) {
 
         return String.format("""
                 # ══════════════════════════════════════════════════
-                # ☸️  KUBERNETES — DaemonSet Agent (Phase 3)
+                # ☸️  KUBERNETES — CloudShadow Sidecar Agent
                 # ══════════════════════════════════════════════════
                 \s
-                # ── Step 1: Create secret for token ──
+                # ── Step 1: Create a Secret for the token ──
                 kubectl create secret generic cloudshadow-secret \\
-                  --from-literal=token="%s"
+                  --from-literal=server-token="%s"
                 \s
-                # ── Step 2: Apply DaemonSet ──
-                curl -O %s/releases/latest/download/k8s-daemonset.yaml
+                # ── Step 2: Add agent as sidecar in your Pod spec ──
+                # Add this block under "containers:" in your
+                # existing deployment yaml:
                 \s
-                # ── Edit k8s-daemonset.yaml ──
-                # Replace BACKEND_URL with: %s
+                  - name: cloudshadow-agent
+                    image: cloudshadow/docker-agent:latest
+                    env:
+                      - name: SERVER_TOKEN
+                        valueFrom:
+                          secretKeyRef:
+                            name: cloudshadow-secret
+                            key: server-token
+                      - name: BACKEND_URL
+                        value: "%s"
+                      - name: MONITOR_CONTAINER
+                        value: "your-container-name"
+                      - name: INTERVAL
+                        value: "20"
+                    volumeMounts:
+                      - name: docker-sock
+                        mountPath: /var/run/docker.sock
                 \s
-                kubectl apply -f k8s-daemonset.yaml
+                # ── Step 3: Add volume to your Pod spec ──
+                # Add this block under "volumes:" section:
                 \s
-                # ── Step 3: Verify DaemonSet running on all nodes ──
-                kubectl get daemonset cloudshadow-agent -n monitoring
-                kubectl get pods -n monitoring
+                  volumes:
+                    - name: docker-sock
+                      hostPath:
+                        path: /var/run/docker.sock
+                        type: Socket
                 \s
-                # ── Step 4: View logs ──
-                kubectl logs -l app=cloudshadow-agent -n monitoring -f
+                # ── Step 4: Apply your updated manifest ──
+                kubectl apply -f your-deployment.yaml
+                \s
+                # ── Step 5: Verify agent is running ──
+                kubectl get pods
+                kubectl logs <your-pod-name> -c cloudshadow-agent
+                \s
+                # ── Step 6: View live logs ──
+                kubectl logs -f <your-pod-name> -c cloudshadow-agent
                 \s
                 # ══════════════════════════════════════════════════
-                # ⚠️  Kubernetes agent coming in Phase 3
-                # Use Normal Server agent for now
+                # ⚙️  Useful commands:
+                # Logs   → kubectl logs -f <pod> -c cloudshadow-agent
+                # Status → kubectl describe pod <pod-name>
+                # Delete → kubectl delete secret cloudshadow-secret
                 # ══════════════════════════════════════════════════
                 """,
                 token,
-                agentDownloadUrl,
                 backendUrl
         );
     }
