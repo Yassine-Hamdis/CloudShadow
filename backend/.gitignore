@@ -36,3 +36,5 @@ build/
 .env
 *.env
 application-docker.properties
+
+docker-compose.yml
