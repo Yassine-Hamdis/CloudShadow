@@ -223,7 +223,7 @@ public class InstallInstructionsGenerator {
                 # existing deployment yaml:
                 \s
                   - name: cloudshadow-agent
-                    image: cloudshadow/docker-agent:latest
+                    image: yacinham10/cloudshadow-docker-agent:latest
                     env:
                       - name: SERVER_TOKEN
                         valueFrom:

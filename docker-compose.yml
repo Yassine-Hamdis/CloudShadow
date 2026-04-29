@@ -82,25 +82,6 @@ services:
       retries: 3
       start_period: 30s
 
-  # ─── CloudShadow Agent ────────────────────────────────────────────────
-  agent:
-    build:
-      context: ./agent
-      dockerfile: Dockerfile
-    container_name: cloudshadow-agent
-    restart: unless-stopped
-    env_file:
-      - .env
-    environment:
-      BACKEND_URL: ${BACKEND_URL}
-      SERVER_TOKEN: ${AGENT_SERVER_TOKEN}
-      INTERVAL: ${AGENT_INTERVAL}
-    depends_on:
-      backend:
-        condition: service_healthy
-    networks:
-      - cloudshadow-network
-
   # ─── React Frontend ───────────────────────────────────────────────────
   frontend:
     build:
