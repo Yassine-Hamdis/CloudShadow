@@ -10,6 +10,28 @@ const WS_URL = import.meta.env.VITE_WS_URL ||
                (window.location.origin.replace('http', 'ws') + '/ws') ||
                'http://localhost:8080/ws'
 
+const toMs = (value) => {
+  if (value === null || value === undefined || value === '') return NaN
+
+  if (typeof value === 'number') {
+    if (!Number.isFinite(value)) return NaN
+    return value < 1e12 ? value * 1000 : value
+  }
+
+  if (typeof value === 'string') {
+    const numeric = Number(value)
+    if (Number.isFinite(numeric)) {
+      return numeric < 1e12 ? numeric * 1000 : numeric
+    }
+  }
+
+  const parsed = new Date(value).getTime()
+  return Number.isFinite(parsed) ? parsed : NaN
+}
+
+const metricTimestamp = (metric) =>
+  metric?.timestamp ?? metric?.collectedAt ?? metric?.createdAt ?? metric?.time ?? metric?.ts ?? null
+
 export const useWebSocket = () => {
   const clientRef = useRef(null)
 
@@ -38,7 +60,25 @@ export const useWebSocket = () => {
               if (Number(message.companyId) !== Number(companyId)) return
 
               if (message.type === 'NEW_METRIC') {
-                appendMetric(message.data)
+                const metric = message.data
+                appendMetric(metric)
+
+                const serverId = Number(metric?.serverId ?? metric?.serverID ?? metric?.server?.id)
+                const tsValue = metricTimestamp(metric)
+                const tsMs = toMs(tsValue)
+
+                if (Number.isFinite(serverId) && Number.isFinite(tsMs)) {
+                  window.dispatchEvent(
+                    new CustomEvent('server-status-change', {
+                      detail: {
+                        serverId,
+                        serverName: metric?.serverName ?? metric?.name,
+                        lastSeen: new Date(tsMs).toISOString(),
+                        status: 'ONLINE',
+                      },
+                    })
+                  )
+                }
               }
             } catch (err) {
               console.error('[WS] Error parsing metric message:', err)

@@ -2,8 +2,36 @@ import { create } from 'zustand'
 
 const LIVE_WINDOW = 300
 
+const toMs = (value) => {
+  if (value === null || value === undefined || value === '') return NaN
+
+  if (typeof value === 'number') {
+    if (!Number.isFinite(value)) return NaN
+    return value < 1e12 ? value * 1000 : value
+  }
+
+  if (typeof value === 'string') {
+    const numeric = Number(value)
+    if (Number.isFinite(numeric)) {
+      return numeric < 1e12 ? numeric * 1000 : numeric
+    }
+  }
+
+  const parsed = new Date(value).getTime()
+  return Number.isFinite(parsed) ? parsed : NaN
+}
+
+const metricTimestampMs = (metric) =>
+  toMs(
+    metric?.timestamp ??
+    metric?.collectedAt ??
+    metric?.createdAt ??
+    metric?.time ??
+    metric?.ts
+  )
+
 const byTimestampAsc = (a, b) =>
-  new Date(a.timestamp).getTime() - new Date(b.timestamp).getTime()
+  metricTimestampMs(a) - metricTimestampMs(b)
 
 const useMetricsStore = create((set) => ({
   // Map<serverId, MetricResponse[]>

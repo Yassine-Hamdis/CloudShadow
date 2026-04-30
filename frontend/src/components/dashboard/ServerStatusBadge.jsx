@@ -1,6 +1,25 @@
 import { useEffect, useState } from 'react'
 import { formatDistanceToNow } from 'date-fns'
 
+const toMs = (value) => {
+  if (value === null || value === undefined || value === '') return NaN
+
+  if (typeof value === 'number') {
+    if (!Number.isFinite(value)) return NaN
+    return value < 1e12 ? value * 1000 : value
+  }
+
+  if (typeof value === 'string') {
+    const numeric = Number(value)
+    if (Number.isFinite(numeric)) {
+      return numeric < 1e12 ? numeric * 1000 : numeric
+    }
+  }
+
+  const parsed = new Date(value).getTime()
+  return Number.isFinite(parsed) ? parsed : NaN
+}
+
 /**
  * Determines server status:
  * ONLINE  = lastSeen within 5 minutes
@@ -28,7 +47,7 @@ export default function ServerStatusBadge({ serverId, lastSeen: initialLastSeen 
   }, [serverId])
 
   const isOnline = lastSeen
-    ? (Date.now() - new Date(lastSeen).getTime()) < 5 * 60 * 1000
+    ? (Date.now() - toMs(lastSeen)) < 5 * 60 * 1000
     : false
 
   const label     = isOnline ? 'ONLINE' : 'OFFLINE'

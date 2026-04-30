@@ -18,6 +18,25 @@ const getMetricStatus = (value) => {
   return 'normal'
 }
 
+const toMs = (value) => {
+  if (value === null || value === undefined || value === '') return NaN
+
+  if (typeof value === 'number') {
+    if (!Number.isFinite(value)) return NaN
+    return value < 1e12 ? value * 1000 : value
+  }
+
+  if (typeof value === 'string') {
+    const numeric = Number(value)
+    if (Number.isFinite(numeric)) {
+      return numeric < 1e12 ? numeric * 1000 : numeric
+    }
+  }
+
+  const parsed = new Date(value).getTime()
+  return Number.isFinite(parsed) ? parsed : NaN
+}
+
 export default function OverviewPage() {
   const { metricsByServer, latestByServer, setMetrics, setLatest } = useMetricsStore()
   const { alerts, criticalCount } = useAlertsStore()
@@ -30,14 +49,14 @@ export default function OverviewPage() {
   const [serverNamesById, setServerNamesById] = useState({})
   const [serverStatusesById, setServerStatusesById] = useState({})
 
-  const getMs = (value) => new Date(value).getTime()
+  const getMs = (value) => toMs(value)
 
   const isRecent = (value, maxAgeMs = 5 * 60 * 1000) => {
     const ts = getMs(value)
     return Number.isFinite(ts) && Date.now() - ts < maxAgeMs
   }
 
-  // ── Load servers + their latest metrics ──────────────────────────────────
+  // ── Load servers + their latest metrics + periodically refresh status ────────
   useEffect(() => {
     const load = async () => {
       setLoading(true)
@@ -90,6 +109,10 @@ export default function OverviewPage() {
       }
     }
     load()
+
+    // Refresh server status every 30 seconds so OFFLINE/ONLINE updates are reflected
+    const interval = setInterval(load, 30000)
+    return () => clearInterval(interval)
   }, [role])
 
   const serverOptions = useMemo(() => {

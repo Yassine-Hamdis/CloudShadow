@@ -7,7 +7,7 @@ import LoadingSpinner  from '../../components/common/LoadingSpinner'
 import useMetricsStore from '../../store/metricsStore'
 import useAuthStore    from '../../store/authStore'
 import { getServers }  from '../../api/servers'
-import { getMetricsByServer, getLatestMetric } from '../../api/metrics'
+import { getMetricsByServer, getLatestMetric, getMetricsByRange } from '../../api/metrics'
 
 const RANGES = [
   { label: '1h',  hours: 1  },
@@ -15,6 +15,34 @@ const RANGES = [
   { label: '24h', hours: 24 },
   { label: '7d',  hours: 168 },
 ]
+
+const toMs = (value) => {
+  if (value === null || value === undefined || value === '') return NaN
+
+  if (typeof value === 'number') {
+    if (!Number.isFinite(value)) return NaN
+    return value < 1e12 ? value * 1000 : value
+  }
+
+  if (typeof value === 'string') {
+    const numeric = Number(value)
+    if (Number.isFinite(numeric)) {
+      return numeric < 1e12 ? numeric * 1000 : numeric
+    }
+  }
+
+  const parsed = new Date(value).getTime()
+  return Number.isFinite(parsed) ? parsed : NaN
+}
+
+const metricTimestampMs = (metric) =>
+  toMs(
+    metric?.timestamp ??
+    metric?.collectedAt ??
+    metric?.createdAt ??
+    metric?.time ??
+    metric?.ts
+  )
 
 export default function MetricsPage() {
   const { metricsByServer, latestByServer, setMetrics, setLatest } = useMetricsStore()
@@ -29,13 +57,13 @@ export default function MetricsPage() {
   const [serverStatuses, setServerStatuses] = useState({})
   const [serverNamesById, setServerNamesById] = useState({})
 
-  const getMs = (timestamp) => new Date(timestamp).getTime()
+  const getMs = (timestamp) => toMs(timestamp)
   const isFresh = (timestamp, maxAgeMs = 5 * 60 * 1000) => {
     const ts = getMs(timestamp)
     return Number.isFinite(ts) && Date.now() - ts < maxAgeMs
   }
 
-  // ── Load server list ────────────────────────────────────────────────────
+  // ── Load server list + periodically refresh for status updates ─────────────
   useEffect(() => {
     const load = async () => {
       setLoadingServers(true)
@@ -65,6 +93,10 @@ export default function MetricsPage() {
       }
     }
     load()
+
+    // Refresh server status every 30 seconds so OFFLINE/ONLINE updates are reflected
+    const interval = setInterval(load, 30000)
+    return () => clearInterval(interval)
   }, [role])
 
   const serverOptions = useMemo(() => {
@@ -130,6 +162,27 @@ export default function MetricsPage() {
     }
   }, [serverOptions, selectedId])
 
+  // Derive online state from fresh latest metric when no status event is received.
+  useEffect(() => {
+    setServerStatuses((prev) => {
+      const next = { ...prev }
+
+      Object.keys(latestByServer).forEach((id) => {
+        const numericId = Number(id)
+        const latestTsMs = metricTimestampMs(latestByServer[id])
+        if (!Number.isFinite(latestTsMs)) return
+
+        const isOnline = Date.now() - latestTsMs < 5 * 60 * 1000
+        next[numericId] = {
+          lastSeen: new Date(latestTsMs).toISOString(),
+          isOnline,
+        }
+      })
+
+      return next
+    })
+  }, [latestByServer])
+
   // ── Listen for real-time server status changes ───────────────────────
   useEffect(() => {
     const handler = (e) => {
@@ -165,12 +218,22 @@ export default function MetricsPage() {
     try {
       const nowMs = Date.now()
       const fromMs = nowMs - (range.hours * 60 * 60 * 1000)
+      const from = new Date(fromMs).toISOString()
+      const to = new Date(nowMs).toISOString()
 
-      const allServerMetrics = await getMetricsByServer(selectedId)
-      const data = allServerMetrics.filter((m) => {
-        const ts = getMs(m.timestamp)
-        return Number.isFinite(ts) && ts >= fromMs && ts <= nowMs + 60_000
-      })
+      let data = []
+      try {
+        // Try to use backend range endpoint if available
+        data = await getMetricsByRange(from, to)
+      } catch {
+        // Fallback: fetch all metrics and filter on frontend
+        const allServerMetrics = await getMetricsByServer(selectedId)
+        data = allServerMetrics.filter((m) => {
+          const ts = metricTimestampMs(m)
+          return Number.isFinite(ts) && ts >= fromMs && ts <= nowMs + 60_000
+        })
+      }
+
       setMetrics(selectedId, data)
 
       // also fetch latest

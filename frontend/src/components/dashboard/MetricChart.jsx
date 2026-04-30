@@ -4,6 +4,34 @@ import {
 } from 'recharts'
 import { format } from 'date-fns'
 
+const toMs = (value) => {
+  if (value === null || value === undefined || value === '') return NaN
+
+  if (typeof value === 'number') {
+    if (!Number.isFinite(value)) return NaN
+    return value < 1e12 ? value * 1000 : value
+  }
+
+  if (typeof value === 'string') {
+    const numeric = Number(value)
+    if (Number.isFinite(numeric)) {
+      return numeric < 1e12 ? numeric * 1000 : numeric
+    }
+  }
+
+  const parsed = new Date(value).getTime()
+  return Number.isFinite(parsed) ? parsed : NaN
+}
+
+const metricTimestampMs = (metric) =>
+  toMs(
+    metric?.timestamp ??
+    metric?.collectedAt ??
+    metric?.createdAt ??
+    metric?.time ??
+    metric?.ts
+  )
+
 const CustomTooltip = ({ active, payload, label }) => {
   if (!active || !payload?.length) return null
 
@@ -45,10 +73,10 @@ export default function MetricChart({
   loading = false,
 }) {
   const formatted = [...data]
-    .sort((a, b) => new Date(a.timestamp).getTime() - new Date(b.timestamp).getTime())
+    .sort((a, b) => metricTimestampMs(a) - metricTimestampMs(b))
     .map((d) => ({
       ...d,
-      time: d.timestamp,
+      time: metricTimestampMs(d),
     }))
 
   return (
