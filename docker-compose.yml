@@ -46,6 +46,7 @@ services:
       JWT_SECRET: ${JWT_SECRET}
       JWT_EXPIRATION: ${JWT_EXPIRATION}
       AI_SERVICE_URL: ${AI_SERVICE_URL}
+      TZ: Africa/Casablanca
     ports:
       - "8080:8080"
     depends_on:

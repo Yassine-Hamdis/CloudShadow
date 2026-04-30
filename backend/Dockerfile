@@ -18,6 +18,8 @@ RUN mvn clean package -DskipTests
 # ─── Stage 2: Run ─────────────────────────────────────────────────────────
 FROM eclipse-temurin:17-jre-alpine
 
+ENV TZ=Africa/Casablanca
+
 WORKDIR /app
 
 # Non-root user for security
