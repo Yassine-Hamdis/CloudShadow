@@ -2,7 +2,6 @@ package com.yassine.cloudshadow.dto.response;
 
 import lombok.*;
 import java.time.LocalDateTime;
-import com.fasterxml.jackson.annotation.JsonFormat;
 
 @Data
 @Builder
@@ -18,6 +17,5 @@ public class MetricResponse {
     private Float disk;
     private Float networkIn;     // KB/s
     private Float networkOut;    // KB/s
-    @JsonFormat(shape = JsonFormat.Shape.STRING, pattern = "yyyy-MM-dd'T'HH:mm:ss.SSSX", timezone = "UTC")
     private LocalDateTime timestamp;
 }
