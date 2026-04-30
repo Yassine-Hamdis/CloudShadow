@@ -46,7 +46,8 @@ public class SecurityConfig {
                                 "/api/auth/login",
                                 "/api/metrics",
                                 "/ws/**",
-                                "/ws/info/**"
+                                "/ws/info/**",
+                                "/actuator/health"
                         ).permitAll()
 
                         // ── Admin only ──

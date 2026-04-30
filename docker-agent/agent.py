@@ -159,8 +159,8 @@ def collect_container_metrics(container) -> dict:
         "cpu":        cpu,
         "memory":     memory,
         "disk":       disk,
-        "networkIn":  net_in,
-        "networkOut": net_out
+        "network_in":  net_in,
+        "network_out": net_out
     }
 
 
@@ -185,8 +185,8 @@ def send_metrics(metrics: dict) -> bool:
                 f"CPU: {metrics['cpu']}% | "
                 f"MEM: {metrics['memory']}% | "
                 f"DISK: {metrics['disk']}% | "
-                f"NET↓: {metrics['networkIn']} KB | "
-                f"NET↑: {metrics['networkOut']} KB"
+                f"NET↓: {metrics['network_in']} KB | "
+                f"NET↑: {metrics['network_out']} KB"
             )
             return True
         else:
