@@ -8,7 +8,7 @@ import useAlertsStore        from '../store/alertsStore'
 
 const WS_URL = import.meta.env.VITE_WS_URL || 
                (window.location.origin.replace('http', 'ws') + '/ws') ||
-               'http://localhost:8080/ws'
+               'ws://localhost:8080/ws'
 
 const toMs = (value) => {
   if (value === null || value === undefined || value === '') return NaN
