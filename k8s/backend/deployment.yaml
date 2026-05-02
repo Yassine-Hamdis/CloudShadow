@@ -42,7 +42,7 @@ spec:
 
       containers:
         - name: backend
-          image: yacinham10/cloudshadow-backend:latest
+          image: yacinham10/cloudshadow:backend
           imagePullPolicy: Always
           ports:
             - containerPort: 8080

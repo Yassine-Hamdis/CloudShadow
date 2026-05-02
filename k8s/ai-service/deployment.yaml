@@ -18,7 +18,7 @@ spec:
     spec:
       containers:
         - name: ai-service
-          image: yacinham10/cloudshadow-ai:latest
+          image: yacinham10/cloudshadow:ai-service
           imagePullPolicy: Always
           ports:
             - containerPort: 8000

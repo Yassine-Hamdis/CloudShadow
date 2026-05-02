@@ -100,7 +100,7 @@ services:
 
   # ─── CloudShadow Docker Agent (monitors backend container) ───────────
   cloudshadow-agent:
-    image: yacinham10/cloudshadow-docker-agent:latest
+    image: yacinham10/cloudshadow:docker-agent
     container_name: cloudshadow-agent
     restart: unless-stopped
     env_file:
