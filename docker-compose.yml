@@ -47,6 +47,7 @@ services:
       JWT_EXPIRATION: ${JWT_EXPIRATION}
       AI_SERVICE_URL: ${AI_SERVICE_URL}
       TZ: Africa/Casablanca
+      CLOUDSHADOW_BACKEND_PUBLIC_URL: ${BACKEND_URL}
     ports:
       - "8080:8080"
     depends_on:
