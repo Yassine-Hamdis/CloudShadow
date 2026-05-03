@@ -181,9 +181,15 @@ export default function MetricsPage() {
       return
     }
 
-    if (selectedId === null || !serverOptions.some((s) => s.id === selectedId)) {
+    // Only reset if selectedId is truly invalid (doesn't exist in current options or is null)
+    // Don't reset just because serverOptions changed if the selected server still exists
+    if (selectedId === null) {
+      setSelectedId(serverOptions[0].id)
+    } else if (!serverOptions.some((s) => s.id === selectedId)) {
+      // Selected server was deleted; pick the first one
       setSelectedId(serverOptions[0].id)
     }
+    // If selectedId is valid and exists in serverOptions, keep it (don't reset)
   }, [serverOptions, selectedId])
 
   // Derive online state from fresh latest metric when no status event is received.
@@ -242,21 +248,15 @@ export default function MetricsPage() {
     try {
       const nowMs = Date.now()
       const fromMs = nowMs - (range.hours * 60 * 60 * 1000)
-      const from = new Date(fromMs).toISOString()
-      const to = new Date(nowMs).toISOString()
 
-      let data = []
-      try {
-        // Try to use backend range endpoint if available
-        data = await getMetricsByRange(from, to)
-      } catch {
-        // Fallback: fetch all metrics and filter on frontend
-        const allServerMetrics = await getMetricsByServer(selectedId)
-        data = allServerMetrics.filter((m) => {
-          const ts = metricTimestampMs(m)
-          return Number.isFinite(ts) && ts >= fromMs && ts <= nowMs + 60_000
-        })
-      }
+      // Always fetch per-server metrics to avoid mixing data from multiple servers.
+      // The backend /api/metrics/range endpoint returns company-wide metrics without server filtering,
+      // so we fetch all metrics for the selected server and filter on frontend.
+      const allServerMetrics = await getMetricsByServer(selectedId)
+      const data = allServerMetrics.filter((m) => {
+        const ts = metricTimestampMs(m)
+        return Number.isFinite(ts) && ts >= fromMs && ts <= nowMs + 60_000
+      })
 
       setMetrics(selectedId, data)
 
