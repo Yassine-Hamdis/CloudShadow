@@ -13,3 +13,4 @@ data:
   AI_SERVICE_URL: "http://ai-service:8000"
   JWT_EXPIRATION: "86400000"
   TZ: "Africa/Casablanca"
+  CLOUDSHADOW_BACKEND_PUBLIC_URL: "http://129.212.221.50:80"
