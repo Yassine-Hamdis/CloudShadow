@@ -1,0 +1,12 @@
+# ─── Agent ConfigMap ──────────────────────────────────────────────────────
+# Non-sensitive agent configuration
+apiVersion: v1
+kind: ConfigMap
+metadata:
+  name: agent-config
+  namespace: monitoring
+data:
+  # Backend URL uses K8s DNS:
+  # <service-name>.<namespace>.svc.cluster.local
+  BACKEND_URL: "http://backend.cloudshadow.svc.cluster.local:8080"
+  INTERVAL: "20"
