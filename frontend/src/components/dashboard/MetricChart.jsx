@@ -13,13 +13,33 @@ const toMs = (value) => {
   }
 
   if (typeof value === 'string') {
-    const numeric = Number(value)
+    const s = value.trim()
+
+    const numeric = Number(s)
     if (Number.isFinite(numeric)) {
       return numeric < 1e12 ? numeric * 1000 : numeric
     }
+
+    const m = s.match(/^(\d{4}-\d{2}-\d{2})[ T](\d{2}:\d{2}:\d{2})(\.\d+)?(Z|[+-]\d{2}:?\d{2})?$/)
+    if (m) {
+      const date = m[1]
+      const time = m[2]
+      let frac = m[3] || ''
+      if (frac) {
+        frac = frac.slice(0, 4)
+        if (frac.length === 2) frac = frac + '0'
+      }
+      const tz = m[4] || 'Z'
+      const iso = `${date}T${time}${frac}${tz}`
+      const parsedIso = Date.parse(iso)
+      if (Number.isFinite(parsedIso)) return parsedIso
+    }
+
+    const parsed = Date.parse(s)
+    return Number.isFinite(parsed) ? parsed : NaN
   }
 
-  const parsed = new Date(value).getTime()
+  const parsed = Date.parse(value)
   return Number.isFinite(parsed) ? parsed : NaN
 }
 
