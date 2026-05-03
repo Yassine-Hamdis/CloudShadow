@@ -210,62 +210,77 @@ public class InstallInstructionsGenerator {
             String token, String backendUrl) {
 
         return String.format("""
-                # ══════════════════════════════════════════════════
-                # ☸️  KUBERNETES — CloudShadow Sidecar Agent
-                # ══════════════════════════════════════════════════
-                \s
-                # ── Step 1: Create a Secret for the token ──
-                kubectl create secret generic cloudshadow-secret \\
-                  --from-literal=server-token="%s"
-                \s
-                # ── Step 2: Add agent as sidecar in your Pod spec ──
-                # Add this block under "containers:" in your
-                # existing deployment yaml:
-                \s
-                  - name: cloudshadow-agent
-                    image: yacinham10/cloudshadow-docker-agent:latest
-                    env:
-                      - name: SERVER_TOKEN
-                        valueFrom:
-                          secretKeyRef:
-                            name: cloudshadow-secret
-                            key: server-token
-                      - name: BACKEND_URL
-                        value: "%s"
-                      - name: MONITOR_CONTAINER
-                        value: "your-container-name"
-                      - name: INTERVAL
-                        value: "20"
-                    volumeMounts:
-                      - name: docker-sock
-                        mountPath: /var/run/docker.sock
-                \s
-                # ── Step 3: Add volume to your Pod spec ──
-                # Add this block under "volumes:" section:
-                \s
-                  volumes:
-                    - name: docker-sock
-                      hostPath:
-                        path: /var/run/docker.sock
-                        type: Socket
-                \s
-                # ── Step 4: Apply your updated manifest ──
-                kubectl apply -f your-deployment.yaml
-                \s
-                # ── Step 5: Verify agent is running ──
-                kubectl get pods
-                kubectl logs <your-pod-name> -c cloudshadow-agent
-                \s
-                # ── Step 6: View live logs ──
-                kubectl logs -f <your-pod-name> -c cloudshadow-agent
-                \s
-                # ══════════════════════════════════════════════════
-                # ⚙️  Useful commands:
-                # Logs   → kubectl logs -f <pod> -c cloudshadow-agent
-                # Status → kubectl describe pod <pod-name>
-                # Delete → kubectl delete secret cloudshadow-secret
-                # ══════════════════════════════════════════════════
-                """,
+            # ══════════════════════════════════════════════════════
+            # ☸️  KUBERNETES — CloudShadow Agent (DaemonSet)
+            # ══════════════════════════════════════════════════════
+            \s
+            # ── How it works ─────────────────────────────────────
+            # The DaemonSet runs ONE agent pod on EVERY node
+            # in your cluster automatically.
+            # All nodes report metrics under this one server entry.
+            # New nodes joining the cluster get the agent automatically.
+            \s
+            # ── Prerequisites ─────────────────────────────────────
+            # Make sure metrics-server is installed:
+            kubectl top nodes
+            # If command fails, install metrics-server first:
+            kubectl apply -f https://github.com/kubernetes-sigs/metrics-server/releases/latest/download/components.yaml
+            \s
+            # ── Step 1: Create monitoring namespace ───────────────
+            kubectl create namespace monitoring
+            \s
+            # ── Step 2: Create secret with your server token ──────
+            # This token is shared across all nodes
+            kubectl create secret generic agent-secret \\
+              --namespace monitoring \\
+              --from-literal=server-token="%s"
+            \s
+            # ── Step 3: Apply RBAC permissions ────────────────────
+            # Grants agent permission to read node/pod metrics
+            curl -LO https://raw.githubusercontent.com/Yassine-Hamdis/CloudShadow/main/k8s/monitoring/rbac.yaml
+            kubectl apply -f rbac.yaml
+            \s
+            # ── Step 4: Apply the DaemonSet ───────────────────────
+            curl -LO https://raw.githubusercontent.com/Yassine-Hamdis/CloudShadow/main/k8s/monitoring/daemonset.yaml
+            \s
+            # ── Edit daemonset.yaml ───────────────────────────
+            # Find the BACKEND_URL value and replace it:
+            # BACKEND_URL: "%s"
+            # (This is your CloudShadow backend public URL)
+            \s
+            kubectl apply -f daemonset.yaml
+            \s
+            # ── Step 5: Verify running on ALL nodes ───────────────
+            # You should see ONE pod per node
+            kubectl get daemonset -n monitoring
+            kubectl get pods -n monitoring -l app=cloudshadow-agent -o wide
+            # -o wide shows which NODE each pod is running on
+            \s
+            # ── Step 6: View live logs from all nodes ─────────────
+            kubectl logs -l app=cloudshadow-agent -n monitoring -f
+            \s
+            # ── Step 7: Verify metrics are flowing ────────────────
+            # Check logs for: ✅ Metrics sent successfully
+            kubectl logs -l app=cloudshadow-agent -n monitoring --tail=20
+            \s
+            # ══════════════════════════════════════════════════════
+            # ⚙️  Useful commands:
+            # How many nodes?  → kubectl get nodes
+            # Agent status     → kubectl get pods -n monitoring -o wide
+            # Single node logs → kubectl logs <pod-name> -n monitoring -f
+            # Restart agent    → kubectl rollout restart daemonset cloudshadow-agent -n monitoring
+            # Delete agent     → kubectl delete daemonset cloudshadow-agent -n monitoring
+            # Delete all       → kubectl delete namespace monitoring
+            # ══════════════════════════════════════════════════════
+            \s
+            # ══════════════════════════════════════════════════════
+            # ℹ️  Note:
+            # All nodes in your cluster report metrics under
+            # this single server entry in your dashboard.
+            # The agent automatically runs on new nodes
+            # when they join your cluster.
+            # ══════════════════════════════════════════════════════
+            """,
                 token,
                 backendUrl
         );
