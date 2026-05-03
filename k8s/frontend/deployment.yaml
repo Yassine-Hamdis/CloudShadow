@@ -16,7 +16,7 @@ spec:
     spec:
       containers:
         - name: frontend
-          image: yacinham10/cloudshadow:frontend
+          image: yacinham10/cloudshadow:frontend_latest
           imagePullPolicy: Always
           ports:
             - containerPort: 80
