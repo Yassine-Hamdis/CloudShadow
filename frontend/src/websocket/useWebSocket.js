@@ -5,49 +5,11 @@ import toast                 from 'react-hot-toast'
 import useAuthStore          from '../store/authStore'
 import useMetricsStore       from '../store/metricsStore'
 import useAlertsStore        from '../store/alertsStore'
+import { parseTimestampMs }  from '../utils/time'
 
 const WS_URL = import.meta.env.VITE_WS_URL || 
                (window.location.origin.replace('http', 'ws') + '/ws') ||
                'ws://localhost:8080/ws'
-
-const toMs = (value) => {
-  if (value === null || value === undefined || value === '') return NaN
-
-  if (typeof value === 'number') {
-    if (!Number.isFinite(value)) return NaN
-    return value < 1e12 ? value * 1000 : value
-  }
-
-  if (typeof value === 'string') {
-    const s = value.trim()
-
-    const numeric = Number(s)
-    if (Number.isFinite(numeric)) {
-      return numeric < 1e12 ? numeric * 1000 : numeric
-    }
-
-    const m = s.match(/^(\d{4}-\d{2}-\d{2})[ T](\d{2}:\d{2}:\d{2})(\.\d+)?(Z|[+-]\d{2}:?\d{2})?$/)
-    if (m) {
-      const date = m[1]
-      const time = m[2]
-      let frac = m[3] || ''
-      if (frac) {
-        frac = frac.slice(0, 4)
-        if (frac.length === 2) frac = frac + '0'
-      }
-      const tz = m[4] || 'Z'
-      const iso = `${date}T${time}${frac}${tz}`
-      const parsedIso = Date.parse(iso)
-      if (Number.isFinite(parsedIso)) return parsedIso
-    }
-
-    const parsed = Date.parse(s)
-    return Number.isFinite(parsed) ? parsed : NaN
-  }
-
-  const parsed = Date.parse(value)
-  return Number.isFinite(parsed) ? parsed : NaN
-}
 
 const metricTimestamp = (metric) =>
   metric?.timestamp ?? metric?.collectedAt ?? metric?.createdAt ?? metric?.time ?? metric?.ts ?? null
@@ -85,7 +47,7 @@ export const useWebSocket = () => {
 
                 const serverId = Number(metric?.serverId ?? metric?.serverID ?? metric?.server?.id)
                 const tsValue = metricTimestamp(metric)
-                const tsMs = toMs(tsValue)
+                const tsMs = parseTimestampMs(tsValue)
 
                 if (Number.isFinite(serverId) && Number.isFinite(tsMs)) {
                   window.dispatchEvent(

@@ -8,6 +8,7 @@ import useMetricsStore from '../../store/metricsStore'
 import useAuthStore    from '../../store/authStore'
 import { getServers }  from '../../api/servers'
 import { getMetricsByServer, getLatestMetric, getMetricsByRange } from '../../api/metrics'
+import { parseTimestampMs } from '../../utils/time'
 
 const RANGES = [
   { label: '1h',  hours: 1  },
@@ -16,51 +17,8 @@ const RANGES = [
   { label: '7d',  hours: 168 },
 ]
 
-const toMs = (value) => {
-  if (value === null || value === undefined || value === '') return NaN
-
-  if (typeof value === 'number') {
-    if (!Number.isFinite(value)) return NaN
-    return value < 1e12 ? value * 1000 : value
-  }
-
-  if (typeof value === 'string') {
-    const s = value.trim()
-
-    // numeric epoch (seconds or ms)
-    const numeric = Number(s)
-    if (Number.isFinite(numeric)) {
-      return numeric < 1e12 ? numeric * 1000 : numeric
-    }
-
-    // Handle datetime strings like "2026-04-30 21:28:36.862722" or
-    // "2026-04-30T21:28:36.862722" optionally with timezone offset.
-    const m = s.match(/^(\d{4}-\d{2}-\d{2})[ T](\d{2}:\d{2}:\d{2})(\.\d+)?(Z|[+-]\d{2}:?\d{2})?$/)
-    if (m) {
-      const date = m[1]
-      const time = m[2]
-      let frac = m[3] || '' // includes dot
-      if (frac) {
-        // keep milliseconds precision (3 digits)
-        frac = frac.slice(0, 4)
-        if (frac.length === 2) frac = frac + '0'
-      }
-      const tz = m[4] || 'Z'
-      const iso = `${date}T${time}${frac}${tz}`
-      const parsedIso = Date.parse(iso)
-      if (Number.isFinite(parsedIso)) return parsedIso
-    }
-
-    const parsed = Date.parse(s)
-    return Number.isFinite(parsed) ? parsed : NaN
-  }
-
-  const parsed = Date.parse(value)
-  return Number.isFinite(parsed) ? parsed : NaN
-}
-
 const metricTimestampMs = (metric) =>
-  toMs(
+  parseTimestampMs(
     metric?.timestamp ??
     metric?.collectedAt ??
     metric?.createdAt ??
@@ -81,7 +39,7 @@ export default function MetricsPage() {
   const [serverStatuses, setServerStatuses] = useState({})
   const [serverNamesById, setServerNamesById] = useState({})
 
-  const getMs = (timestamp) => toMs(timestamp)
+  const getMs = (timestamp) => parseTimestampMs(timestamp)
   const isFresh = (timestamp, maxAgeMs = 5 * 60 * 1000) => {
     const ts = getMs(timestamp)
     return Number.isFinite(ts) && Date.now() - ts < maxAgeMs
@@ -104,7 +62,7 @@ export default function MetricsPage() {
         srvs.forEach(s => {
           statuses[s.id] = s.lastSeen ? {
             lastSeen: s.lastSeen,
-            isOnline: (Date.now() - new Date(s.lastSeen).getTime()) < 5 * 60 * 1000
+            isOnline: (Date.now() - parseTimestampMs(s.lastSeen)) < 5 * 60 * 1000
           } : { lastSeen: null, isOnline: false }
         })
         setServerStatuses(statuses)
@@ -246,7 +204,7 @@ export default function MetricsPage() {
     if (!selectedId) return
     setLoading(true)
     try {
-      const nowMs = Date.now()
+        const nowMs = Date.now()
       const fromMs = nowMs - (range.hours * 60 * 60 * 1000)
 
       // Always fetch per-server metrics to avoid mixing data from multiple servers.

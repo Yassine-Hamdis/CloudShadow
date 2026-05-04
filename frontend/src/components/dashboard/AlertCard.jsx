@@ -1,6 +1,6 @@
 import { formatDistanceToNow } from 'date-fns'
 import AlertBadge from './AlertBadge'
-import { Cpu, HardDrive, MemoryStick } from 'lucide-react'
+import { Cpu, HardDrive, MemoryStick, Sparkles } from 'lucide-react'
 
 const TYPE_ICONS = {
   CPU:    <Cpu    className="w-4 h-4" />,
@@ -15,7 +15,7 @@ const TYPE_COLORS = {
 }
 
 export default function AlertCard({ alert }) {
-  const { serverName, type, severity, message, timestamp } = alert
+  const { serverName, type, severity, message, timestamp, isAiGenerated } = alert
 
   const timeAgo = formatDistanceToNow(new Date(timestamp), { addSuffix: true })
 
@@ -38,6 +38,12 @@ export default function AlertCard({ alert }) {
       {/* Content */}
       <div className="flex-1 min-w-0">
         <div className="flex items-center gap-2 flex-wrap mb-1">
+          {isAiGenerated && (
+            <div className="flex items-center gap-1 px-2 py-0.5 rounded-full bg-[#6366F1]/20 border border-[#6366F1]/30">
+              <Sparkles className="w-3 h-3" style={{ color: '#6366F1' }} />
+              <span className="text-xs font-semibold text-[#6366F1]">AI</span>
+            </div>
+          )}
           <AlertBadge severity={severity} />
           <span className="text-xs text-[#9AA6B2] font-mono">
             {serverName}

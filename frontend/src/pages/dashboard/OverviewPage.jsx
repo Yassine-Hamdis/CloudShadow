@@ -11,50 +11,12 @@ import useAlertsStore  from '../../store/alertsStore'
 import useAuthStore    from '../../store/authStore'
 import { getServers }           from '../../api/servers'
 import { getLatestMetric, getMetricsByServer } from '../../api/metrics'
+import { parseTimestampMs } from '../../utils/time'
 
 const getMetricStatus = (value) => {
   if (value >= 90) return 'danger'
   if (value >= 75) return 'warning'
   return 'normal'
-}
-
-const toMs = (value) => {
-  if (value === null || value === undefined || value === '') return NaN
-
-  if (typeof value === 'number') {
-    if (!Number.isFinite(value)) return NaN
-    return value < 1e12 ? value * 1000 : value
-  }
-
-  if (typeof value === 'string') {
-    const s = value.trim()
-
-    const numeric = Number(s)
-    if (Number.isFinite(numeric)) {
-      return numeric < 1e12 ? numeric * 1000 : numeric
-    }
-
-    const m = s.match(/^(\d{4}-\d{2}-\d{2})[ T](\d{2}:\d{2}:\d{2})(\.\d+)?(Z|[+-]\d{2}:?\d{2})?$/)
-    if (m) {
-      const date = m[1]
-      const time = m[2]
-      let frac = m[3] || ''
-      if (frac) {
-        frac = frac.slice(0, 4)
-        if (frac.length === 2) frac = frac + '0'
-      }
-      const tz = m[4] || 'Z'
-      const iso = `${date}T${time}${frac}${tz}`
-      const parsedIso = Date.parse(iso)
-      if (Number.isFinite(parsedIso)) return parsedIso
-    }
-
-    const parsed = Date.parse(s)
-    return Number.isFinite(parsed) ? parsed : NaN
-  }
-
-  const parsed = Date.parse(value)
-  return Number.isFinite(parsed) ? parsed : NaN
 }
 
 export default function OverviewPage() {
@@ -69,7 +31,7 @@ export default function OverviewPage() {
   const [serverNamesById, setServerNamesById] = useState({})
   const [serverStatusesById, setServerStatusesById] = useState({})
 
-  const getMs = (value) => toMs(value)
+  const getMs = (value) => parseTimestampMs(value)
 
   const isRecent = (value, maxAgeMs = 5 * 60 * 1000) => {
     const ts = getMs(value)

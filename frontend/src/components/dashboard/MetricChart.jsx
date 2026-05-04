@@ -2,49 +2,10 @@ import {
   LineChart, Line, XAxis, YAxis, CartesianGrid,
   Tooltip, ResponsiveContainer, Legend,
 } from 'recharts'
-import { format } from 'date-fns'
-
-const toMs = (value) => {
-  if (value === null || value === undefined || value === '') return NaN
-
-  if (typeof value === 'number') {
-    if (!Number.isFinite(value)) return NaN
-    return value < 1e12 ? value * 1000 : value
-  }
-
-  if (typeof value === 'string') {
-    const s = value.trim()
-
-    const numeric = Number(s)
-    if (Number.isFinite(numeric)) {
-      return numeric < 1e12 ? numeric * 1000 : numeric
-    }
-
-    const m = s.match(/^(\d{4}-\d{2}-\d{2})[ T](\d{2}:\d{2}:\d{2})(\.\d+)?(Z|[+-]\d{2}:?\d{2})?$/)
-    if (m) {
-      const date = m[1]
-      const time = m[2]
-      let frac = m[3] || ''
-      if (frac) {
-        frac = frac.slice(0, 4)
-        if (frac.length === 2) frac = frac + '0'
-      }
-      const tz = m[4] || 'Z'
-      const iso = `${date}T${time}${frac}${tz}`
-      const parsedIso = Date.parse(iso)
-      if (Number.isFinite(parsedIso)) return parsedIso
-    }
-
-    const parsed = Date.parse(s)
-    return Number.isFinite(parsed) ? parsed : NaN
-  }
-
-  const parsed = Date.parse(value)
-  return Number.isFinite(parsed) ? parsed : NaN
-}
+import { formatTimestampInTimeZone, parseTimestampMs } from '../../utils/time'
 
 const metricTimestampMs = (metric) =>
-  toMs(
+  parseTimestampMs(
     metric?.timestamp ??
     metric?.collectedAt ??
     metric?.createdAt ??
@@ -58,7 +19,11 @@ const CustomTooltip = ({ active, payload, label }) => {
   return (
     <div className="bg-[#1f2937] border border-[#374151] rounded-lg p-3 text-xs shadow-xl">
       <p className="text-[#9AA6B2] mb-2">
-        {label ? format(new Date(label), 'HH:mm:ss') : ''}
+        {label ? formatTimestampInTimeZone(label, {
+          hour: '2-digit',
+          minute: '2-digit',
+          second: '2-digit',
+        }) : ''}
       </p>
       {payload.map((entry) => (
         <div key={entry.dataKey} className="flex items-center gap-2 mb-1">
@@ -117,7 +82,10 @@ export default function MetricChart({
             <CartesianGrid strokeDasharray="3 3" stroke="#374151" vertical={false} />
             <XAxis
               dataKey="time"
-              tickFormatter={(t) => format(new Date(t), 'HH:mm')}
+              tickFormatter={(t) => formatTimestampInTimeZone(t, {
+                hour: '2-digit',
+                minute: '2-digit',
+              })}
               tick={{ fill: '#9AA6B2', fontSize: 11 }}
               axisLine={{ stroke: '#374151' }}
               tickLine={false}
