@@ -1,0 +1,173 @@
+name: Agents CI/CD
+
+on:
+  push:
+    branches:
+      - main
+    paths:
+      # Triggers if ANY agent changes
+      - 'agent/**'
+      - 'docker-agent/**'
+      - 'k8s-agent/**'
+      - '.github/workflows/agents.yml'
+
+  workflow_dispatch:
+
+jobs:
+
+  # ── Normal Server Agent ──────────────────────────────────────────────────
+  build-normal-agent:
+    name: Build Normal Server Agent
+    runs-on: ubuntu-latest
+    # Only run if normal agent changed
+    if: |
+      contains(github.event.head_commit.modified, 'agent/') ||
+      github.event_name == 'workflow_dispatch'
+
+    steps:
+      - name: Checkout repository
+        uses: actions/checkout@v4
+
+      - name: Set up Python
+        uses: actions/setup-python@v5
+        with:
+          python-version: '3.11'
+
+      - name: Validate agent
+        working-directory: ./agent
+        run: |
+          pip install -r requirements.txt
+          python -m py_compile agent.py
+          echo "✅ Normal agent valid"
+
+      - name: Login to Docker Hub
+        uses: docker/login-action@v3
+        with:
+          username: ${{ secrets.DOCKERHUB_USERNAME }}
+          password: ${{ secrets.DOCKERHUB_TOKEN }}
+
+      - name: Set up Docker Buildx
+        uses: docker/setup-buildx-action@v3
+
+      - name: Build and push normal agent
+        uses: docker/build-push-action@v5
+        with:
+          context: ./agent
+          dockerfile: ./agent/Dockerfile
+          push: true
+          tags: |
+            ${{ secrets.DOCKERHUB_USERNAME }}/cloudshadow-agent:latest
+            ${{ secrets.DOCKERHUB_USERNAME }}/cloudshadow-agent:${{ github.sha }}
+          cache-from: type=gha
+          cache-to: type=gha,mode=max
+
+  # ── Docker Agent ─────────────────────────────────────────────────────────
+  build-docker-agent:
+    name: Build Docker Sidecar Agent
+    runs-on: ubuntu-latest
+    if: |
+      contains(github.event.head_commit.modified, 'docker-agent/') ||
+      github.event_name == 'workflow_dispatch'
+
+    steps:
+      - name: Checkout repository
+        uses: actions/checkout@v4
+
+      - name: Set up Python
+        uses: actions/setup-python@v5
+        with:
+          python-version: '3.11'
+
+      - name: Validate docker agent
+        working-directory: ./docker-agent
+        run: |
+          pip install -r requirements.txt
+          python -m py_compile agent.py
+          echo "✅ Docker agent valid"
+
+      - name: Login to Docker Hub
+        uses: docker/login-action@v3
+        with:
+          username: ${{ secrets.DOCKERHUB_USERNAME }}
+          password: ${{ secrets.DOCKERHUB_TOKEN }}
+
+      - name: Set up Docker Buildx
+        uses: docker/setup-buildx-action@v3
+
+      - name: Build and push docker agent
+        uses: docker/build-push-action@v5
+        with:
+          context: ./docker-agent
+          dockerfile: ./docker-agent/Dockerfile
+          push: true
+          tags: |
+            ${{ secrets.DOCKERHUB_USERNAME }}/cloudshadow-docker-agent:latest
+            ${{ secrets.DOCKERHUB_USERNAME }}/cloudshadow-docker-agent:${{ github.sha }}
+          cache-from: type=gha
+          cache-to: type=gha,mode=max
+
+  # ── K8s Agent ────────────────────────────────────────────────────────────
+  build-k8s-agent:
+    name: Build K8s DaemonSet Agent
+    runs-on: ubuntu-latest
+    if: |
+      contains(github.event.head_commit.modified, 'k8s-agent/') ||
+      github.event_name == 'workflow_dispatch'
+
+    steps:
+      - name: Checkout repository
+        uses: actions/checkout@v4
+
+      - name: Set up Python
+        uses: actions/setup-python@v5
+        with:
+          python-version: '3.11'
+
+      - name: Validate k8s agent
+        working-directory: ./k8s-agent
+        run: |
+          pip install -r requirements.txt
+          python -m py_compile agent.py
+          echo "✅ K8s agent valid"
+
+      - name: Login to Docker Hub
+        uses: docker/login-action@v3
+        with:
+          username: ${{ secrets.DOCKERHUB_USERNAME }}
+          password: ${{ secrets.DOCKERHUB_TOKEN }}
+
+      - name: Set up Docker Buildx
+        uses: docker/setup-buildx-action@v3
+
+      - name: Build and push k8s agent
+        uses: docker/build-push-action@v5
+        with:
+          context: ./k8s-agent
+          dockerfile: ./k8s-agent/Dockerfile
+          push: true
+          tags: |
+            ${{ secrets.DOCKERHUB_USERNAME }}/cloudshadow-k8s-agent:latest
+            ${{ secrets.DOCKERHUB_USERNAME }}/cloudshadow-k8s-agent:${{ github.sha }}
+          cache-from: type=gha
+          cache-to: type=gha,mode=max
+
+  # ── Summary ──────────────────────────────────────────────────────────────
+  summary:
+    name: Build Summary
+    runs-on: ubuntu-latest
+    needs:
+      - build-normal-agent
+      - build-docker-agent
+      - build-k8s-agent
+    if: always()
+
+    steps:
+      - name: Pipeline Summary
+        run: |
+          echo "════════════════════════════════════"
+          echo "  CloudShadow Agents Build Summary  "
+          echo "════════════════════════════════════"
+          echo "Normal Agent:  ${{ needs.build-normal-agent.result }}"
+          echo "Docker Agent:  ${{ needs.build-docker-agent.result }}"
+          echo "K8s Agent:     ${{ needs.build-k8s-agent.result }}"
+          echo "════════════════════════════════════"
