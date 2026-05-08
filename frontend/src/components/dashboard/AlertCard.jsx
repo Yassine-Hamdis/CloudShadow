@@ -15,7 +15,7 @@ const TYPE_COLORS = {
 }
 
 export default function AlertCard({ alert }) {
-  const { serverName, type, severity, message, timestamp, isAiGenerated } = alert
+  const { serverName, type, severity, message, timestamp, isAiGenerated, confidenceScore, predictionWindow, recommendedAction } = alert
 
   const timeAgo = formatDistanceToNow(new Date(timestamp), { addSuffix: true })
 
@@ -53,6 +53,45 @@ export default function AlertCard({ alert }) {
           </span>
         </div>
         <p className="text-sm text-[#E6EEF2] leading-6">{message}</p>
+        
+        {/* AI Fields */}
+        {isAiGenerated && (
+          <div className="mt-3 pt-3 border-t border-[#374151] space-y-2">
+            {confidenceScore && (
+              <div className="flex items-center gap-2">
+                <span className="text-xs text-[#9AA6B2]">Confidence:</span>
+                <div className="flex items-center gap-2 flex-1">
+                  <div className="flex-1 h-1.5 bg-[#374151] rounded-full overflow-hidden">
+                    <div
+                      className="h-full bg-[#6366F1]"
+                      style={{ width: `${Math.min(100, confidenceScore * 100)}%` }}
+                    />
+                  </div>
+                  <span className="text-xs font-semibold text-[#6366F1]">
+                    {Math.round(confidenceScore * 100)}%
+                  </span>
+                </div>
+              </div>
+            )}
+            
+            {predictionWindow && (
+              <div className="flex items-center gap-2">
+                <span className="text-xs text-[#9AA6B2]">Window:</span>
+                <span className="text-xs font-medium text-[#E6EEF2]">{predictionWindow}</span>
+              </div>
+            )}
+            
+            {recommendedAction && (
+              <div className="flex items-start gap-2">
+                <span className="text-xs text-[#9AA6B2] flex-shrink-0 pt-0.5">Action:</span>
+                <p className="text-xs text-[#E6EEF2] bg-[#0F172A]/50 rounded px-2 py-1.5 flex-1">
+                  {recommendedAction}
+                </p>
+              </div>
+            )}
+          </div>
+        )}
+        
         <p className="text-xs text-[#9AA6B2] mt-2">{timeAgo}</p>
       </div>
     </div>
