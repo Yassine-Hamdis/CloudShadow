@@ -26,7 +26,7 @@ public class Server {
     @Column(nullable = false, unique = true)
     private String token;
 
-    @Column(name = "created_at")
+    @Column(name = "created_at", nullable = false)
     private LocalDateTime createdAt;
 
     // ─── NEW: tracks last metric received time ─────────────────────────

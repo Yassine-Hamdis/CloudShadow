@@ -7,7 +7,8 @@ WORKDIR /app
 COPY pom.xml .
 
 # Download dependencies
-RUN mvn dependency:go-offline -B
+RUN mvn dependency:resolve \
+    -Dmaven.wagon.http.retryHandler.count=5
 
 # Copy source
 COPY src ./src

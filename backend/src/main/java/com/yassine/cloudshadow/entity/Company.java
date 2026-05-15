@@ -19,7 +19,7 @@ public class Company {
     @Column(nullable = false, unique = true)
     private String name;
 
-    @Column(name = "created_at")
+    @Column(name = "created_at", nullable = false)
     private LocalDateTime createdAt;
 
     @OneToMany(mappedBy = "company", cascade = CascadeType.ALL, fetch = FetchType.LAZY)

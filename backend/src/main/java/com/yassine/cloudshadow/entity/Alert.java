@@ -38,7 +38,7 @@ public class Alert {
 
     // false = threshold alert (AiService)
     // true  = AI pattern alert (AiAlertService)
-    @Column(name = "is_ai_generated")
+    @Column(name = "is_ai_generated", nullable = false)
     @Builder.Default
     private Boolean isAiGenerated = false;
 
