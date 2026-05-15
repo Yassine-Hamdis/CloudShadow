@@ -1,0 +1,97 @@
+apiVersion: apps/v1
+kind: StatefulSet
+metadata:
+  name: mysql
+  namespace: {{ .Values.namespace }}
+spec:
+  serviceName: mysql
+  replicas: 1
+  selector:
+    matchLabels:
+      app: mysql
+  template:
+    metadata:
+      labels:
+        app: mysql
+    spec:
+      containers:
+        - name: mysql
+          image: mysql:8.0
+          ports:
+            - containerPort: 3306
+          env:
+            - name: MYSQL_ROOT_PASSWORD
+              valueFrom:
+                secretKeyRef:
+                  name: mysql-secret
+                  key: root-password
+            - name: MYSQL_DATABASE
+              valueFrom:
+                secretKeyRef:
+                  name: mysql-secret
+                  key: database
+            - name: MYSQL_USER
+              valueFrom:
+                secretKeyRef:
+                  name: mysql-secret
+                  key: username
+            - name: MYSQL_PASSWORD
+              valueFrom:
+                secretKeyRef:
+                  name: mysql-secret
+                  key: password
+          volumeMounts:
+            - name: mysql-storage
+              mountPath: /var/lib/mysql
+            - name: init-sql
+              mountPath: /docker-entrypoint-initdb.d
+          resources:
+            requests:
+              memory: {{ .Values.mysql.resources.requests.memory }}
+              cpu: {{ .Values.mysql.resources.requests.cpu }}
+            limits:
+              memory: {{ .Values.mysql.resources.limits.memory }}
+              cpu: {{ .Values.mysql.resources.limits.cpu }}
+          readinessProbe:
+            exec:
+              command:
+                - mysqladmin
+                - ping
+                - "-h"
+                - localhost
+            initialDelaySeconds: 30
+            periodSeconds: 10
+            timeoutSeconds: 5
+            failureThreshold: 5
+          livenessProbe:
+            exec:
+              command:
+                - mysqladmin
+                - ping
+                - "-h"
+                - localhost
+            initialDelaySeconds: 60
+            periodSeconds: 30
+            timeoutSeconds: 5
+      volumes:
+        - name: mysql-storage
+          persistentVolumeClaim:
+            claimName: mysql-pvc
+        - name: init-sql
+          configMap:
+            name: mysql-init-sql
+
+---
+apiVersion: v1
+kind: ConfigMap
+metadata:
+  name: mysql-init-sql
+  namespace: {{ .Values.namespace }}
+data:
+  init.sql: |
+    CREATE DATABASE IF NOT EXISTS {{ .Values.mysql.database }};
+    CREATE USER IF NOT EXISTS '{{ .Values.mysql.username }}'@'%'
+      IDENTIFIED BY '{{ .Values.mysql.password }}';
+    GRANT ALL PRIVILEGES ON {{ .Values.mysql.database }}.*
+      TO '{{ .Values.mysql.username }}'@'%';
+    FLUSH PRIVILEGES;

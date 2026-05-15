@@ -1,0 +1,20 @@
+# ─── Development overrides ────────────────────────────────────────────────
+# Usage: helm upgrade --install cloudshadow ./helm/cloudshadow
+#        -f helm/cloudshadow/values-dev.yaml
+
+namespace: cloudshadow-dev
+
+publicUrl: "http://localhost:8080"
+
+mysql:
+  storageClass: "standard"  # minikube storage class
+  storage: "5Gi"
+
+backend:
+  replicas: 1
+
+aiService:
+  replicas: 1
+
+frontend:
+  replicas: 1

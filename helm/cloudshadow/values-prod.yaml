@@ -1,0 +1,42 @@
+# ─── Production overrides ─────────────────────────────────────────────────
+# Usage: helm upgrade --install cloudshadow ./helm/cloudshadow
+#        -f helm/cloudshadow/values-prod.yaml
+#        --set publicUrl=http://YOUR-EXTERNAL-IP
+#        --set mysql.rootPassword=YOUR-SECURE-PASSWORD
+#        --set backend.jwtSecret=YOUR-SECURE-SECRET
+
+namespace: cloudshadow
+
+mysql:
+  storageClass: "gp2"       # AWS EKS storage class
+  storage: "20Gi"
+  resources:
+    requests:
+      memory: "512Mi"
+      cpu: "500m"
+    limits:
+      memory: "1Gi"
+      cpu: "1000m"
+
+backend:
+  replicas: 2               # High availability
+  resources:
+    requests:
+      memory: "512Mi"
+      cpu: "500m"
+    limits:
+      memory: "1Gi"
+      cpu: "1000m"
+
+aiService:
+  replicas: 2
+  resources:
+    requests:
+      memory: "512Mi"
+      cpu: "500m"
+    limits:
+      memory: "1Gi"
+      cpu: "1000m"
+
+frontend:
+  replicas: 2

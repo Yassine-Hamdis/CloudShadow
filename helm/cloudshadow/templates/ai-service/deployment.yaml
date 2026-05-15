@@ -1,0 +1,40 @@
+apiVersion: apps/v1
+kind: Deployment
+metadata:
+  name: ai-service
+  namespace: {{ .Values.namespace }}
+spec:
+  replicas: {{ .Values.aiService.replicas }}
+  selector:
+    matchLabels:
+      app: ai-service
+  template:
+    metadata:
+      labels:
+        app: ai-service
+    spec:
+      containers:
+        - name: ai-service
+          image: "{{ .Values.imageRegistry }}/cloudshadow-ai:latest"
+          imagePullPolicy: {{ .Values.imagePullPolicy }}
+          ports:
+            - containerPort: 8000
+          resources:
+            requests:
+              memory: {{ .Values.aiService.resources.requests.memory }}
+              cpu: {{ .Values.aiService.resources.requests.cpu }}
+            limits:
+              memory: {{ .Values.aiService.resources.limits.memory }}
+              cpu: {{ .Values.aiService.resources.limits.cpu }}
+          readinessProbe:
+            httpGet:
+              path: /health
+              port: 8000
+            initialDelaySeconds: 20
+            periodSeconds: 10
+          livenessProbe:
+            httpGet:
+              path: /health
+              port: 8000
+            initialDelaySeconds: 30
+            periodSeconds: 30

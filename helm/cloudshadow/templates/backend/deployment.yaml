@@ -1,0 +1,48 @@
+apiVersion: apps/v1
+kind: Deployment
+metadata:
+  name: backend
+  namespace: {{ .Values.namespace }}
+spec:
+  replicas: {{ .Values.backend.replicas }}
+  selector:
+    matchLabels:
+      app: backend
+  template:
+    metadata:
+      labels:
+        app: backend
+    spec:
+      initContainers:
+        - name: wait-for-mysql
+          image: busybox:1.35
+          command: ['sh', '-c', 'until nc -z mysql 3306; do sleep 3; done']
+        - name: wait-for-ai
+          image: busybox:1.35
+          command: ['sh', '-c', 'until nc -z ai-service 8000; do sleep 3; done']
+      containers:
+        - name: backend
+          image: "{{ .Values.imageRegistry }}/cloudshadow-backend:latest"
+          imagePullPolicy: {{ .Values.imagePullPolicy }}
+          ports:
+            - containerPort: 8080
+          envFrom:
+            - configMapRef:
+                name: backend-config
+          env:
+            - name: SPRING_DATASOURCE_PASSWORD
+              valueFrom:
+                secretKeyRef:
+                  name: backend-secret
+                  key: db-password
+            - name: JWT_SECRET
+              valueFrom:
+                secretKeyRef:
+                  name: backend-secret
+                  key: jwt-secret
+          readinessProbe:
+            httpGet:
+              path: /actuator/health
+              port: 8080
+            initialDelaySeconds: 60
+            periodSeconds: 15
