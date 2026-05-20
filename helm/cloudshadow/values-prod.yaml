@@ -7,8 +7,10 @@
 
 namespace: cloudshadow
 
+# ── MySQL disabled (using RDS) ────────────────────────────────────────────
 mysql:
-  storageClass: "gp2"       # AWS EKS storage class
+  enabled: false          # ← RDS handles this
+  storageClass: "gp2"       # AWS EBS storage class
   storage: "20Gi"
   resources:
     requests:
@@ -38,5 +40,7 @@ aiService:
       memory: "1Gi"
       cpu: "1000m"
 
+# ── Frontend disabled (using S3 + CloudFront) ─────────────────────────────
 frontend:
+  enabled: false          # ← CloudFront handles this
   replicas: 2

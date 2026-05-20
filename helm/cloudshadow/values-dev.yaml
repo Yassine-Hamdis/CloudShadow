@@ -6,7 +6,9 @@ namespace: cloudshadow-dev
 
 publicUrl: "http://localhost:8080"
 
+# ── MySQL enabled (in-cluster for local dev) ──────────────────────────────
 mysql:
+  enabled: true           # ← run MySQL in cluster locally
   storageClass: "standard"  # minikube storage class
   storage: "5Gi"
 
@@ -16,5 +18,7 @@ backend:
 aiService:
   replicas: 1
 
+# ── Frontend enabled (in-cluster for local dev) ───────────────────────────
 frontend:
+  enabled: true           # ← run frontend in cluster locally
   replicas: 1

@@ -1,0 +1,72 @@
+# ─── Global ───────────────────────────────────────────────────────────────
+namespace: cloudshadow
+imageRegistry: yacinham10
+imagePullPolicy: Always
+
+# ─── Public URL ───────────────────────────────────────────────────────────
+# Override with: --set publicUrl=http://your-external-ip
+publicUrl: "http://localhost:8080"
+
+# ─── MySQL ────────────────────────────────────────────────────────────────
+mysql:
+  # !! ON AWS: set enabled=false, use RDS instead
+  # !! ON LOCAL: set enabled=true
+  enabled: true                 # ← NEW FLAG
+  rootPassword: "rootpassword123"
+  database: "cloudShadowdb"
+  username: "cloudshadow_user"
+  password: "cloudshadow123"
+  storage: "10Gi"
+  storageClass: "do-block-storage"
+  resources:
+    requests:
+      memory: "256Mi"
+      cpu: "250m"
+    limits:
+      memory: "512Mi"
+      cpu: "500m"
+
+# ─── Backend ──────────────────────────────────────────────────────────────
+backend:
+  replicas: 1
+  jwtSecret: "cloudshadow-super-secret-key-must-be-at-least-256-bits-long!!"
+  jwtExpiration: "86400000"
+  timezone: "Africa/Casablanca"
+  datasourceUrl: ""             # ← NEW (set by Terraform)
+  resources:
+    requests:
+      memory: "512Mi"
+      cpu: "250m"
+    limits:
+      memory: "1Gi"
+      cpu: "500m"
+
+# ─── AI Service ───────────────────────────────────────────────────────────
+aiService:
+  replicas: 1
+  resources:
+    requests:
+      memory: "256Mi"
+      cpu: "250m"
+    limits:
+      memory: "512Mi"
+      cpu: "500m"
+
+# ─── Frontend ─────────────────────────────────────────────────────────────
+frontend:
+  # !! ON AWS: set enabled=false, use S3+CloudFront
+  # !! ON LOCAL: set enabled=true
+  enabled: true                 # ← NEW FLAG
+  replicas: 1
+  resources:
+    requests:
+      memory: "64Mi"
+      cpu: "50m"
+    limits:
+      memory: "128Mi"
+      cpu: "100m"
+
+# ─── Ingress ──────────────────────────────────────────────────────────────
+ingress:
+  enabled: true
+  className: "nginx"

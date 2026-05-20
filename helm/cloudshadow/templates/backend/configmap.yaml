@@ -5,7 +5,14 @@ metadata:
   namespace: {{ .Values.namespace }}
 data:
   SPRING_PROFILES_ACTIVE: "docker"
+
+  {{- if .Values.mysql.enabled }}
+  # Local MySQL in cluster
   SPRING_DATASOURCE_URL: "jdbc:mysql://mysql:3306/{{ .Values.mysql.database }}?createDatabaseIfNotExist=true"
+  {{- else }}
+  # AWS RDS MySQL (set by Terraform)
+  SPRING_DATASOURCE_URL: "{{ .Values.backend.datasourceUrl }}"
+  { { - end } }
   SPRING_DATASOURCE_USERNAME: "{{ .Values.mysql.username }}"
   AI_SERVICE_URL: "http://ai-service:8000"
   JWT_EXPIRATION: "{{ .Values.backend.jwtExpiration }}"
