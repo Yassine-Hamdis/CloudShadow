@@ -17,6 +17,7 @@
 
 [Overview](#-overview) •
 [Features](#-features) •
+[Screenshots](#-screenshots) •
 [Architecture](#-architecture) •
 [Tech Stack](#-tech-stack) •
 [Quick Start](#-quick-start) •
@@ -113,6 +114,49 @@ CloudShadow is a **production-grade server monitoring platform** built with mode
 - Token-based agent authentication
 - Support for Normal / Docker / Kubernetes deployments
 - Secure token storage (shown once, managed securely)
+
+---
+
+## 📸 Screenshots
+
+### Authentication
+
+<p align="center">
+  <img src="screenshots/login.png" width="45%">
+  <img src="screenshots/register.png" width="45%">
+</p>
+
+### Dashboard Overview for Admin
+
+<p align="center">
+  <img src="screenshots/overview1.png" width="80%">
+</p>
+
+### User Management
+
+<p align="center">
+  <img src="screenshots/userUI.png" width="80%">
+</p>
+
+### Monitoring & Analytics
+
+<p align="center">
+  <img src="screenshots/graphs.png" width="45%">
+  <img src="screenshots/alerts.png" width="45%">
+</p>
+
+### Administration
+
+<p align="center">
+  <img src="screenshots/adduser.png" width="45%">
+  <img src="screenshots/addserver.png" width="45%">
+</p>
+
+### Installation Guide
+
+<p align="center">
+  <img src="screenshots/instructions.png" width="80%">
+</p>
 
 ---
 
